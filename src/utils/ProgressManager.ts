@@ -6,6 +6,9 @@
 
 const STORAGE_UNLOCKED_KEY = 'lgp_unlocked_level';
 const STORAGE_STARS_KEY = 'lgp_level_stars';
+const STORAGE_ENDLESS_KEY = 'lgp_endless_streak';
+
+export const MAX_LEVELS = 100;
 
 export class ProgressManager {
   /**
@@ -17,7 +20,7 @@ export class ProgressManager {
       const val = localStorage.getItem(STORAGE_UNLOCKED_KEY);
       if (val) {
         const num = parseInt(val, 10);
-        if (!isNaN(num) && num >= 1 && num <= 20) {
+        if (!isNaN(num) && num >= 1 && num <= MAX_LEVELS) {
           return num;
         }
       }
@@ -34,7 +37,7 @@ export class ProgressManager {
   public static unlockNextLevel(completedLevelId: number): number {
     const current = this.getUnlockedLevel();
     const nextLevel = completedLevelId + 1;
-    const newUnlocked = Math.min(20, Math.max(current, nextLevel));
+    const newUnlocked = Math.min(MAX_LEVELS, Math.max(current, nextLevel));
 
     try {
       localStorage.setItem(STORAGE_UNLOCKED_KEY, newUnlocked.toString());
@@ -80,6 +83,41 @@ export class ProgressManager {
       console.warn('ProgressManager: Failed to read stars', e);
     }
     return {};
+  }
+
+  /**
+   * Get total stars earned across all levels.
+   */
+  public static getTotalStars(): number {
+    const stars = this.getAllStars();
+    return Object.values(stars).reduce((sum, s) => sum + s, 0);
+  }
+
+  /**
+   * Endless mode streak / high score.
+   */
+  public static getEndlessStreak(): number {
+    try {
+      const val = localStorage.getItem(STORAGE_ENDLESS_KEY);
+      if (val) {
+        const num = parseInt(val, 10);
+        return isNaN(num) ? 0 : num;
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    return 0;
+  }
+
+  public static saveEndlessStreak(streak: number): void {
+    try {
+      const current = this.getEndlessStreak();
+      if (streak > current) {
+        localStorage.setItem(STORAGE_ENDLESS_KEY, streak.toString());
+      }
+    } catch (e) {
+      console.warn(e);
+    }
   }
 
   /**

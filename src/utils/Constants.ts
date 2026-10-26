@@ -32,15 +32,22 @@ export const COLORS = {
 
   // Gate Visuals
   GATE_BODY: 0x112238,
-  GATE_BODY_LOCKED: 0x1e3020,
+  GATE_BODY_LOCKED: 0x202936,     // Heavy metallic locked base
   GATE_BORDER: 0x00a8cc,
-  GATE_BORDER_LOCKED: 0xffc400,
+  GATE_BORDER_LOCKED: 0x7c8c9e,   // Industrial steel border
   GATE_TEXT: 0xffffff,
 
   // LED States
   LED_ON: 0x00ff66,
   LED_OFF: 0x1c2b3a,
   LED_GLOW: 0x00ff88,
+  LED_ZERO_TARGET: 0x00b4d8,     // Target 0 indicator (Cyan blue)
+  LED_ZERO_MATCH: 0x00f5d4,      // Target 0 matched
+  LED_ALERT_RED: 0xff2255,       // Short-circuit / mismatch red
+
+  // Short Circuit Penalty
+  SHORT_CIRCUIT_RED: 0xff1744,
+  SHORT_CIRCUIT_GLOW: 0xff5252,
 
   // UI
   UI_PANEL: 0x0d1a2d,
@@ -62,10 +69,16 @@ export enum GateType {
   WIRE = 'WIRE',                 // Straight wire (Left-Right at 0)
   WIRE_CORNER = 'WIRE_CORNER',   // 90° corner wire (Left-Down at 0)
   SPLIT = 'SPLIT',               // T-Junction wire (Left-Right-Down at 0)
+  SPLIT_4 = 'SPLIT_4',           // 4-Way Cross Splitter (Left-Right-Up-Down)
+  CROSSOVER = 'CROSSOVER',       // Wire Bridge / Cầu vượt cáp (H & V independent)
+  DIODE = 'DIODE',               // Cổng 1 chiều (Unidirectional diode)
   NOT = 'NOT',                   // Inverter
   AND = 'AND',                   // AND Gate
   OR = 'OR',                     // OR Gate
   XOR = 'XOR',                   // XOR Gate
+  NAND = 'NAND',                 // NAND Gate (AND + NOT)
+  NOR = 'NOR',                   // NOR Gate (OR + NOT)
+  XNOR = 'XNOR',                 // XNOR Gate (XOR + NOT)
   SOURCE = 'SOURCE',             // Power input 0 or 1
   LED = 'LED',                   // Target LED
   EMPTY = 'EMPTY',
@@ -84,6 +97,7 @@ export interface Port {
   direction: Direction;
   isInput: boolean;
   signal?: number; // 0 or 1
+  channel?: 'H' | 'V'; // For crossover bridge independent routing
 }
 
 // Gate definition for a cell
@@ -91,23 +105,33 @@ export interface GateDefinition {
   type: GateType;
   rotation: number;          // Current rotation: 0, 1, 2, 3
   correctRotation: number;   // Solution rotation: 0, 1, 2, 3
-  fixed: boolean;            // Fixed cells cannot be rotated
+  fixed: boolean;            // Fixed / locked metallic cells cannot be rotated
   locked?: boolean;          // Locked by Hint button
   ports?: Port[];            // Optional custom ports
+}
+
+// Multi-Test-Case definition (Truth Table testing)
+export interface TestCase {
+  name?: string;
+  sources: { row: number; col: number; value: number }[];
+  leds: { row: number; col: number; targetSignal: number }[];
 }
 
 // Level definition
 export interface LevelDefinition {
   id: number;
+  chapter: number;           // Chapter 1 to 5 (or 6 for Endless)
   name: string;
   subtitle: string;
   gridWidth: number;
   gridHeight: number;
   tutorialText: string;
   timeLimit: number;         // Time limit in seconds
+  parMoves: number;          // Optimal moves for 3-star rating
   cells: (GateDefinition | null)[][];
   sources: { row: number; col: number; value: number }[];
-  leds: { row: number; col: number }[];
+  leds: { row: number; col: number; targetSignal?: number }[]; // targetSignal: 1 (default) or 0
+  testCases?: TestCase[];    // Dynamic clock / truth-table test cases
 }
 
 // Animation durations

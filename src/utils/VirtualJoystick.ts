@@ -125,6 +125,14 @@ export class VirtualJoystick {
     this.direction.isDown = this.direction.force > 0.15;
   }
 
+  public getValue(): { x: number; y: number } {
+    return { x: this.direction.x, y: this.direction.y };
+  }
+
+  public getForce(): { x: number; y: number } {
+    return { x: this.direction.x, y: this.direction.y };
+  }
+
   public setVisible(visible: boolean): void {
     this.container.setVisible(visible);
   }

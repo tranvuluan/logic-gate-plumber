@@ -18,17 +18,27 @@ export class ProceduralGraphics {
     this.generateGateTexture(GateType.OR);
     this.generateGateTexture(GateType.XOR);
     this.generateGateTexture(GateType.NOT);
+    this.generateGateTexture(GateType.NAND);
+    this.generateGateTexture(GateType.NOR);
+    this.generateGateTexture(GateType.XNOR);
+    this.generateGateTexture(GateType.DIODE);
     this.generateGateTexture(GateType.WIRE);
     this.generateGateTexture(GateType.WIRE_CORNER);
     this.generateGateTexture(GateType.SPLIT);
+    this.generateGateTexture(GateType.SPLIT_4);
+    this.generateGateTexture(GateType.CROSSOVER);
 
     // Terminal components
     this.generateSourceTexture(0);
     this.generateSourceTexture(1);
-    this.generateLEDTexture(false);
-    this.generateLEDTexture(true);
+    this.generateLEDTexture(false, 1);
+    this.generateLEDTexture(true, 1);
+    this.generateLEDTexture(false, 0);
+    this.generateLEDTexture(true, 0);
 
     // Board & UI elements
+    this.generateLockedPadTexture();
+    this.generateShortCircuitTexture();
     this.generateEmptyCellTexture();
     this.generateParticleTexture();
     this.generatePlayerTexture();
@@ -53,8 +63,17 @@ export class ProceduralGraphics {
       case GateType.XOR:
         this.drawXORGate(g, size, padding);
         break;
-      case GateType.NOT:
-        this.drawNOTGate(g, size, padding);
+      case GateType.NAND:
+        this.drawNANDGate(g, size, padding);
+        break;
+      case GateType.NOR:
+        this.drawNORGate(g, size, padding);
+        break;
+      case GateType.XNOR:
+        this.drawXNORGate(g, size, padding);
+        break;
+      case GateType.DIODE:
+        this.drawDiode(g, size, padding);
         break;
       case GateType.WIRE:
         this.drawWireStraight(g, size);
@@ -64,6 +83,12 @@ export class ProceduralGraphics {
         break;
       case GateType.SPLIT:
         this.drawSplit(g, size);
+        break;
+      case GateType.SPLIT_4:
+        this.drawSplit4(g, size);
+        break;
+      case GateType.CROSSOVER:
+        this.drawCrossover(g, size);
         break;
     }
 
@@ -242,6 +267,281 @@ export class ProceduralGraphics {
     g.strokePath();
   }
 
+  private drawNANDGate(g: Phaser.GameObjects.Graphics, size: number, pad: number): void {
+    const cx = size / 2;
+    const cy = size / 2;
+    const w = size - pad * 2;
+    const h = size - pad * 2;
+
+    g.fillStyle(COLORS.GATE_BODY, 0.95);
+    g.lineStyle(2, COLORS.GATE_BORDER, 0.9);
+    g.fillRoundedRect(pad, pad, w, h, 8);
+    g.strokeRoundedRect(pad, pad, w, h, 8);
+
+    // D-Shape
+    const s = 20;
+    g.lineStyle(3, COLORS.CYBER_CYAN, 1);
+    g.beginPath();
+    g.moveTo(cx - s * 0.8, cy - s);
+    g.lineTo(cx, cy - s);
+    g.arc(cx, cy, s, -Math.PI / 2, Math.PI / 2, false);
+    g.lineTo(cx - s * 0.8, cy + s);
+    g.closePath();
+    g.strokePath();
+
+    // Inverter Bubble
+    g.fillStyle(COLORS.BG_DARK, 1);
+    g.lineStyle(2.5, COLORS.CYBER_CYAN, 1);
+    g.fillCircle(cx + s + 5, cy, 5);
+    g.strokeCircle(cx + s + 5, cy, 5);
+
+    // Input pins (TOP & BOTTOM)
+    g.lineStyle(3, COLORS.CYBER_YELLOW, 0.85);
+    g.beginPath();
+    g.moveTo(cx, pad);
+    g.lineTo(cx, cy - s);
+    g.moveTo(cx, cy + s);
+    g.lineTo(cx, size - pad);
+    g.strokePath();
+
+    // Output pin (RIGHT)
+    g.lineStyle(3, COLORS.SIGNAL_ON, 0.9);
+    g.beginPath();
+    g.moveTo(cx + s + 10, cy);
+    g.lineTo(size, cy);
+    g.strokePath();
+  }
+
+  private drawNORGate(g: Phaser.GameObjects.Graphics, size: number, pad: number): void {
+    const cx = size / 2;
+    const cy = size / 2;
+    const w = size - pad * 2;
+    const h = size - pad * 2;
+
+    g.fillStyle(COLORS.GATE_BODY, 0.95);
+    g.lineStyle(2, COLORS.GATE_BORDER, 0.9);
+    g.fillRoundedRect(pad, pad, w, h, 8);
+    g.strokeRoundedRect(pad, pad, w, h, 8);
+
+    // Curved OR shield
+    const s = 20;
+    g.lineStyle(3, COLORS.CYBER_CYAN, 1);
+    g.beginPath();
+    g.moveTo(cx - s * 0.8, cy - s);
+    g.lineTo(cx + s * 0.2, cy - s * 0.8);
+    g.lineTo(cx + s, cy);
+    g.lineTo(cx + s * 0.2, cy + s * 0.8);
+    g.lineTo(cx - s * 0.8, cy + s);
+    g.lineTo(cx - s * 0.3, cy);
+    g.closePath();
+    g.strokePath();
+
+    // Inverter Bubble
+    g.fillStyle(COLORS.BG_DARK, 1);
+    g.lineStyle(2.5, COLORS.CYBER_CYAN, 1);
+    g.fillCircle(cx + s + 5, cy, 5);
+    g.strokeCircle(cx + s + 5, cy, 5);
+
+    // Input pins (TOP & BOTTOM)
+    g.lineStyle(3, COLORS.CYBER_YELLOW, 0.85);
+    g.beginPath();
+    g.moveTo(cx, pad);
+    g.lineTo(cx, cy - s * 0.7);
+    g.moveTo(cx, cy + s * 0.7);
+    g.lineTo(cx, size - pad);
+    g.strokePath();
+
+    // Output pin (RIGHT)
+    g.lineStyle(3, COLORS.SIGNAL_ON, 0.9);
+    g.beginPath();
+    g.moveTo(cx + s + 10, cy);
+    g.lineTo(size, cy);
+    g.strokePath();
+  }
+
+  private drawXNORGate(g: Phaser.GameObjects.Graphics, size: number, pad: number): void {
+    const cx = size / 2;
+    const cy = size / 2;
+    const w = size - pad * 2;
+    const h = size - pad * 2;
+
+    g.fillStyle(COLORS.GATE_BODY, 0.95);
+    g.lineStyle(2, COLORS.GATE_BORDER, 0.9);
+    g.fillRoundedRect(pad, pad, w, h, 8);
+    g.strokeRoundedRect(pad, pad, w, h, 8);
+
+    // Double-arc XOR
+    const s = 20;
+    g.lineStyle(3, COLORS.CYBER_CYAN, 1);
+    g.beginPath();
+    g.moveTo(cx - s * 0.6, cy - s);
+    g.lineTo(cx + s * 0.2, cy - s * 0.8);
+    g.lineTo(cx + s, cy);
+    g.lineTo(cx + s * 0.2, cy + s * 0.8);
+    g.lineTo(cx - s * 0.6, cy + s);
+    g.lineTo(cx - s * 0.2, cy);
+    g.closePath();
+    g.strokePath();
+
+    // Extra curved line
+    g.beginPath();
+    g.moveTo(cx - s * 0.85, cy - s);
+    g.lineTo(cx - s * 0.45, cy);
+    g.lineTo(cx - s * 0.85, cy + s);
+    g.strokePath();
+
+    // Inverter Bubble
+    g.fillStyle(COLORS.BG_DARK, 1);
+    g.lineStyle(2.5, COLORS.CYBER_CYAN, 1);
+    g.fillCircle(cx + s + 5, cy, 5);
+    g.strokeCircle(cx + s + 5, cy, 5);
+
+    // Input pins
+    g.lineStyle(3, COLORS.CYBER_YELLOW, 0.85);
+    g.beginPath();
+    g.moveTo(cx, pad);
+    g.lineTo(cx, cy - s * 0.7);
+    g.moveTo(cx, cy + s * 0.7);
+    g.lineTo(cx, size - pad);
+    g.strokePath();
+
+    // Output pin
+    g.lineStyle(3, COLORS.SIGNAL_ON, 0.9);
+    g.beginPath();
+    g.moveTo(cx + s + 10, cy);
+    g.lineTo(size, cy);
+    g.strokePath();
+  }
+
+  private drawDiode(g: Phaser.GameObjects.Graphics, size: number, pad: number): void {
+    const cx = size / 2;
+    const cy = size / 2;
+    const w = size - pad * 2;
+    const h = size - pad * 2;
+
+    g.fillStyle(COLORS.GATE_BODY, 0.95);
+    g.lineStyle(2, COLORS.GATE_BORDER, 0.9);
+    g.fillRoundedRect(pad, pad, w, h, 8);
+    g.strokeRoundedRect(pad, pad, w, h, 8);
+
+    const s = 16;
+    // Diode Triangle (Anode -> Cathode)
+    g.fillStyle(COLORS.CYBER_CYAN, 0.35);
+    g.lineStyle(3, COLORS.CYBER_CYAN, 1);
+    g.beginPath();
+    g.moveTo(cx - s, cy - s);
+    g.lineTo(cx + s * 0.5, cy);
+    g.lineTo(cx - s, cy + s);
+    g.closePath();
+    g.fillPath();
+    g.strokePath();
+
+    // Cathode Bar
+    g.lineStyle(3.5, COLORS.CYBER_YELLOW, 1);
+    g.beginPath();
+    g.moveTo(cx + s * 0.5, cy - s);
+    g.lineTo(cx + s * 0.5, cy + s);
+    g.strokePath();
+
+    // Input pin (LEFT)
+    g.lineStyle(3, COLORS.CYBER_YELLOW, 0.85);
+    g.beginPath();
+    g.moveTo(0, cy);
+    g.lineTo(cx - s, cy);
+    g.strokePath();
+
+    // Output pin (RIGHT)
+    g.lineStyle(3, COLORS.SIGNAL_ON, 0.9);
+    g.beginPath();
+    g.moveTo(cx + s * 0.5, cy);
+    g.lineTo(size, cy);
+    g.strokePath();
+  }
+
+  private drawSplit4(g: Phaser.GameObjects.Graphics, size: number): void {
+    const cx = size / 2;
+    const cy = size / 2;
+
+    // 4-Way Cross Conductor: Left, Right, Up, Down
+    g.lineStyle(10, COLORS.SIGNAL_OFF, 0.9);
+    g.beginPath();
+    g.moveTo(0, cy);
+    g.lineTo(size, cy);
+    g.moveTo(cx, 0);
+    g.lineTo(cx, size);
+    g.strokePath();
+
+    g.lineStyle(4, COLORS.WIRE_COPPER, 1);
+    g.beginPath();
+    g.moveTo(0, cy);
+    g.lineTo(size, cy);
+    g.moveTo(cx, 0);
+    g.lineTo(cx, size);
+    g.strokePath();
+
+    // Central circular distribution hub
+    g.fillStyle(COLORS.GATE_BODY, 1);
+    g.fillCircle(cx, cy, 14);
+    g.lineStyle(2, COLORS.CYBER_CYAN, 1);
+    g.strokeCircle(cx, cy, 14);
+
+    g.fillStyle(COLORS.CYBER_YELLOW, 1);
+    g.fillCircle(cx, cy, 6);
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx, cy, 2.5);
+  }
+
+  private drawCrossover(g: Phaser.GameObjects.Graphics, size: number): void {
+    const cx = size / 2;
+    const cy = size / 2;
+
+    // 1. Horizontal Wire (Bottom layer)
+    g.lineStyle(10, COLORS.SIGNAL_OFF, 0.9);
+    g.beginPath();
+    g.moveTo(0, cy);
+    g.lineTo(size, cy);
+    g.strokePath();
+
+    g.lineStyle(4, COLORS.WIRE_COPPER, 1);
+    g.beginPath();
+    g.moveTo(0, cy);
+    g.lineTo(size, cy);
+    g.strokePath();
+
+    // Insulating shadow/ring underneath vertical bridge
+    g.fillStyle(0x050c18, 0.95);
+    g.fillCircle(cx, cy, 13);
+    g.lineStyle(1.5, 0x142844, 1);
+    g.strokeCircle(cx, cy, 13);
+
+    // 2. Vertical Wire (Top layer / Jumper Arch)
+    g.lineStyle(10, COLORS.SIGNAL_OFF, 0.9);
+    g.beginPath();
+    g.moveTo(cx, 0);
+    g.lineTo(cx, cy - 13);
+    g.moveTo(cx, cy + 13);
+    g.lineTo(cx, size);
+    g.strokePath();
+
+    g.lineStyle(4, COLORS.WIRE_COPPER, 1);
+    g.beginPath();
+    g.moveTo(cx, 0);
+    g.lineTo(cx, cy - 13);
+    g.moveTo(cx, cy + 13);
+    g.lineTo(cx, size);
+    g.strokePath();
+
+    // Curved Jumper Bridge arch over horizontal wire
+    g.lineStyle(4, COLORS.CYBER_CYAN, 1);
+    g.beginPath();
+    g.arc(cx, cy, 10, -Math.PI / 2, Math.PI / 2, true);
+    g.strokePath();
+
+    g.fillStyle(COLORS.CYBER_YELLOW, 1);
+    g.fillCircle(cx, cy - 11, 3);
+    g.fillCircle(cx, cy + 11, 3);
+  }
+
   private drawWireStraight(g: Phaser.GameObjects.Graphics, size: number): void {
     const cy = size / 2;
 
@@ -355,47 +655,157 @@ export class ProceduralGraphics {
     g.destroy();
   }
 
-  private generateLEDTexture(isOn: boolean): void {
+  private generateLEDTexture(isOn: boolean, targetSignal: number = 1): void {
     const size = CELL_SIZE;
     const g = this.scene.add.graphics();
     const cx = size / 2;
     const cy = size / 2;
     const radius = 26;
 
-    if (isOn) {
-      // Intense neon radial glow
-      g.fillStyle(COLORS.LED_GLOW, 0.08);
-      g.fillCircle(cx, cy, radius + 22);
-      g.fillStyle(COLORS.LED_GLOW, 0.18);
-      g.fillCircle(cx, cy, radius + 14);
-      g.fillStyle(COLORS.LED_GLOW, 0.35);
-      g.fillCircle(cx, cy, radius + 6);
-    }
+    if (targetSignal === 1) {
+      if (isOn) {
+        // Intense neon green radial glow
+        g.fillStyle(COLORS.LED_GLOW, 0.08);
+        g.fillCircle(cx, cy, radius + 22);
+        g.fillStyle(COLORS.LED_GLOW, 0.18);
+        g.fillCircle(cx, cy, radius + 14);
+        g.fillStyle(COLORS.LED_GLOW, 0.35);
+        g.fillCircle(cx, cy, radius + 6);
+      }
 
-    // Diode dome
-    const color = isOn ? COLORS.LED_ON : COLORS.LED_OFF;
-    g.fillStyle(color, 1);
-    g.lineStyle(3, isOn ? 0x00ff88 : 0x334a60, 1);
-    g.fillCircle(cx, cy, radius);
-    g.strokeCircle(cx, cy, radius);
+      // Diode dome
+      const color = isOn ? COLORS.LED_ON : COLORS.LED_OFF;
+      g.fillStyle(color, 1);
+      g.lineStyle(3, isOn ? 0x00ff88 : 0x334a60, 1);
+      g.fillCircle(cx, cy, radius);
+      g.strokeCircle(cx, cy, radius);
 
-    // Glass reflection
-    if (isOn) {
-      g.fillStyle(0xffffff, 0.6);
-      g.fillCircle(cx - 7, cy - 7, 7);
+      // Glass reflection
+      if (isOn) {
+        g.fillStyle(0xffffff, 0.6);
+        g.fillCircle(cx - 7, cy - 7, 7);
+      } else {
+        g.fillStyle(0xffffff, 0.15);
+        g.fillCircle(cx - 6, cy - 6, 6);
+      }
+
+      // Target mark "1"
+      g.lineStyle(2, isOn ? 0x004422 : 0x4a6a8a, 0.9);
+      g.beginPath();
+      g.moveTo(cx, cy - 8);
+      g.lineTo(cx, cy + 8);
+      g.strokePath();
     } else {
-      g.fillStyle(0xffffff, 0.15);
-      g.fillCircle(cx - 6, cy - 6, 6);
+      // TARGET 0: Blue/Cyan circle indicator (Active low target)
+      if (isOn) {
+        // Satisfied target 0: Glowing Cyan/Teal
+        g.fillStyle(0x00f5d4, 0.1);
+        g.fillCircle(cx, cy, radius + 18);
+        g.fillStyle(0x00b4d8, 0.25);
+        g.fillCircle(cx, cy, radius + 8);
+
+        g.fillStyle(0x0096c7, 1);
+        g.lineStyle(3, 0x00f5d4, 1);
+        g.fillCircle(cx, cy, radius);
+        g.strokeCircle(cx, cy, radius);
+      } else {
+        // Idle or alert: Dark Navy with target zero ring
+        g.fillStyle(0x111e30, 1);
+        g.lineStyle(3, 0x0077b6, 0.9);
+        g.fillCircle(cx, cy, radius);
+        g.strokeCircle(cx, cy, radius);
+      }
+
+      // Ring "0" target mark
+      g.lineStyle(2.5, isOn ? 0xffffff : 0x00b4d8, 0.9);
+      g.strokeCircle(cx, cy, 8);
     }
 
     // Input contact line
-    g.lineStyle(4, isOn ? COLORS.SIGNAL_ON : COLORS.SIGNAL_OFF, 1);
+    const wireColor = isOn ? COLORS.SIGNAL_ON : COLORS.SIGNAL_OFF;
+    g.lineStyle(4, wireColor, 1);
     g.beginPath();
     g.moveTo(0, cy);
     g.lineTo(cx - radius, cy);
     g.strokePath();
 
-    g.generateTexture(isOn ? 'led_on' : 'led_off', size, size);
+    g.generateTexture(`led_${isOn ? 'on' : 'off'}_${targetSignal}`, size, size);
+    if (targetSignal === 1) {
+      // Compatibility alias
+      g.generateTexture(isOn ? 'led_on' : 'led_off', size, size);
+    }
+    g.destroy();
+  }
+
+  private generateLockedPadTexture(): void {
+    const size = CELL_SIZE;
+    const g = this.scene.add.graphics();
+    const pad = 4;
+    const w = size - pad * 2;
+    const h = size - pad * 2;
+
+    // Heavy industrial steel plate
+    g.fillStyle(COLORS.GATE_BODY_LOCKED, 1);
+    g.lineStyle(3, COLORS.GATE_BORDER_LOCKED, 1);
+    g.fillRoundedRect(pad, pad, w, h, 8);
+    g.strokeRoundedRect(pad, pad, w, h, 8);
+
+    // Hazard industrial diagonals in corners
+    g.lineStyle(1.5, 0x4f637a, 0.45);
+    g.beginPath();
+    g.moveTo(pad + 12, pad);
+    g.lineTo(pad, pad + 12);
+    g.moveTo(size - pad - 12, pad);
+    g.lineTo(size - pad, pad + 12);
+    g.moveTo(pad + 12, size - pad);
+    g.lineTo(pad, size - pad - 12);
+    g.moveTo(size - pad - 12, size - pad);
+    g.lineTo(size - pad, size - pad - 12);
+    g.strokePath();
+
+    // 4 Corner Metal Rivets / Hex Screws
+    const rPos = [
+      [pad + 7, pad + 7],
+      [size - pad - 7, pad + 7],
+      [pad + 7, size - pad - 7],
+      [size - pad - 7, size - pad - 7],
+    ];
+    for (const [rx, ry] of rPos) {
+      g.fillStyle(0x7c8c9e, 1);
+      g.fillCircle(rx, ry, 3.5);
+      g.fillStyle(0x1a2430, 1);
+      g.fillCircle(rx, ry, 1.5);
+    }
+
+    g.generateTexture('locked_metal_pad', size, size);
+    g.destroy();
+  }
+
+  private generateShortCircuitTexture(): void {
+    const size = 64;
+    const g = this.scene.add.graphics();
+    const cx = size / 2;
+    const cy = size / 2;
+
+    // Intense Red Warning Pulse
+    g.fillStyle(COLORS.SHORT_CIRCUIT_GLOW, 0.35);
+    g.fillCircle(cx, cy, 26);
+    g.fillStyle(COLORS.SHORT_CIRCUIT_RED, 0.8);
+    g.fillCircle(cx, cy, 18);
+
+    // Hazard lightning bolt
+    g.fillStyle(0xffffff, 1);
+    g.beginPath();
+    g.moveTo(cx + 2, cy - 14);
+    g.lineTo(cx - 8, cy + 1);
+    g.lineTo(cx - 1, cy + 1);
+    g.lineTo(cx - 3, cy + 14);
+    g.lineTo(cx + 8, cy - 2);
+    g.lineTo(cx + 1, cy - 2);
+    g.closePath();
+    g.fillPath();
+
+    g.generateTexture('icon_short_circuit', size, size);
     g.destroy();
   }
 

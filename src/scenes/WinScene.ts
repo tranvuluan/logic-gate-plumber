@@ -2,16 +2,33 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { getLevels } from '../logic/LevelGenerator';
+import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
 
 export class WinScene extends Phaser.Scene {
   private levelId: number = 1;
+  private moves: number = 0;
+  private parMoves: number = 5;
+  private stars: number = 3;
+  private isEndless: boolean = false;
 
   constructor() {
     super({ key: 'WinScene' });
   }
 
-  init(data: { levelId: number }): void {
+  init(data: { levelId: number; moves?: number; parMoves?: number; stars?: number; isEndless?: boolean }): void {
     this.levelId = data.levelId || 1;
+    this.moves = data.moves || 0;
+    this.parMoves = data.parMoves || 5;
+    this.stars = data.stars || 3;
+    this.isEndless = data.isEndless || false;
+
+    if (!this.isEndless) {
+      ProgressManager.saveStars(this.levelId, this.stars);
+      ProgressManager.unlockNextLevel(this.levelId);
+    } else {
+      const streak = ProgressManager.getEndlessStreak();
+      ProgressManager.saveEndlessStreak(Math.max(streak, this.levelId - 100));
+    }
   }
 
   create(): void {
@@ -39,99 +56,87 @@ export class WinScene extends Phaser.Scene {
     });
 
     // Victory icon
-    const icon = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.25, '🎉', {
-      fontSize: '96px',
+    const icon = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.22, '🎉', {
+      fontSize: '84px',
     });
     icon.setOrigin(0.5);
     this.tweens.add({
       targets: icon,
-      y: icon.y - 20,
-      duration: 1500,
+      y: icon.y - 15,
+      duration: 1400,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
 
     // Win text
-    const winText = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT * 0.4,
-      'HOÀN THÀNH!',
-      {
-        fontSize: '40px',
-        fontFamily: 'monospace',
-        color: '#00ff88',
-        fontStyle: 'bold',
-      }
-    );
+    const winTitle = this.isEndless ? `VƯỢT MÀN VÔ TẬN #${this.levelId - 100}!` : 'HOÀN THÀNH MẠCH ĐIỆN!';
+    const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.35, winTitle, {
+      fontSize: '32px',
+      fontFamily: 'monospace',
+      color: '#00ff88',
+      fontStyle: 'bold',
+    });
     winText.setOrigin(0.5);
 
-    // Level info
-    const levelInfo = this.add.text(
+    // Stars rating display (Animated)
+    const starStr = this.stars >= 3 ? '⭐⭐⭐' : this.stars === 2 ? '⭐⭐☆' : '⭐☆☆';
+    const starsText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.42, starStr, {
+      fontSize: '40px',
+    });
+    starsText.setOrigin(0.5);
+    starsText.setScale(0);
+
+    this.tweens.add({
+      targets: starsText,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 500,
+      ease: 'Back.easeOut',
+    });
+
+    // Performance info: Moves & Par
+    const moveInfo = this.add.text(
       GAME_WIDTH / 2,
-      GAME_HEIGHT * 0.47,
-      `Level ${this.levelId} — Tất cả LED đã sáng!`,
+      GAME_HEIGHT * 0.49,
+      `LƯỢT XOAY: ${this.moves} / CHUẨN: ${this.parMoves} BƯỚC\nĐánh giá: ${this.stars === 3 ? '🏆 HOÀN HẢO (3 SAO)' : this.stars === 2 ? '⚡ XUẤT SẮC (2 SAO)' : '👍 ĐẠT YÊU CẦU (1 SAO)'}`,
       {
-        fontSize: '16px',
+        fontSize: '15px',
         fontFamily: 'monospace',
-        color: '#88aacc',
+        color: '#00f0ff',
+        align: 'center',
+        lineSpacing: 8,
       }
     );
-    levelInfo.setOrigin(0.5);
-
-    // LED animation
-    const ledEmojis = '💡💡💡💡💡';
-    const leds = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.53, ledEmojis, {
-      fontSize: '28px',
-    });
-    leds.setOrigin(0.5);
-    this.tweens.add({
-      targets: leds,
-      alpha: { from: 0.4, to: 1 },
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
-    });
+    moveInfo.setOrigin(0.5);
 
     // Buttons
-    const levels = getLevels();
-    const hasNextLevel = this.levelId < levels.length;
-    const btnY = GAME_HEIGHT * 0.65;
+    const btnY = GAME_HEIGHT * 0.63;
+    const hasNext = this.isEndless || this.levelId < MAX_LEVELS;
 
-    if (hasNextLevel) {
-      this.createButton(
-        GAME_WIDTH / 2,
-        btnY,
-        '▶  MÀN TIẾP THEO',
-        '#00ff88',
-        () => {
-          this.cameras.main.resetFX();
-          this.scene.start('GameScene', { levelId: this.levelId + 1 });
-        }
-      );
+    if (hasNext) {
+      const nextLabel = this.isEndless ? '▶  MÀN VÔ TẬN TIẾP THEO' : '▶  MÀN TIẾP THEO';
+      this.createButton(GAME_WIDTH / 2, btnY, nextLabel, '#00ff88', () => {
+        this.cameras.main.resetFX();
+        this.scene.start('GameScene', {
+          levelId: this.levelId + 1,
+          isEndless: this.isEndless,
+        });
+      });
     }
 
-    this.createButton(
-      GAME_WIDTH / 2,
-      btnY + 80,
-      '🔄  CHƠI LẠI',
-      '#00aaff',
-      () => {
-        this.cameras.main.resetFX();
-        this.scene.start('GameScene', { levelId: this.levelId });
-      }
-    );
+    this.createButton(GAME_WIDTH / 2, btnY + 75, '🔄  CHƠI LẠI', '#00aaff', () => {
+      this.cameras.main.resetFX();
+      this.scene.start('GameScene', {
+        levelId: this.levelId,
+        isEndless: this.isEndless,
+      });
+    });
 
-    this.createButton(
-      GAME_WIDTH / 2,
-      btnY + 160,
-      '📋  CHỌN MÀN',
-      '#8888cc',
-      () => {
-        this.cameras.main.resetFX();
-        this.scene.start('LevelSelectScene');
-      }
-    );
+    this.createButton(GAME_WIDTH / 2, btnY + 150, '📋  CHỌN MÀN', '#8888cc', () => {
+      this.cameras.main.resetFX();
+      this.scene.start('LevelSelectScene');
+    });
 
     // Sparkle particles
     this.createSparkles();
@@ -145,7 +150,7 @@ export class WinScene extends Phaser.Scene {
     callback: () => void
   ): void {
     const btnW = 320;
-    const btnH = 55;
+    const btnH = 52;
     const g = this.add.graphics();
 
     g.fillStyle(COLORS.UI_BUTTON, 1);
@@ -154,9 +159,10 @@ export class WinScene extends Phaser.Scene {
     g.strokeRoundedRect(x - btnW / 2, y - btnH / 2, btnW, btnH, 10);
 
     const label = this.add.text(x, y, text, {
-      fontSize: '20px',
+      fontSize: '18px',
       fontFamily: 'monospace',
       color: color,
+      fontStyle: 'bold',
     });
     label.setOrigin(0.5);
 
@@ -167,7 +173,7 @@ export class WinScene extends Phaser.Scene {
         targets: [label],
         scaleX: 0.9,
         scaleY: 0.9,
-        duration: 100,
+        duration: 80,
         yoyo: true,
         onComplete: callback,
       });
@@ -175,7 +181,6 @@ export class WinScene extends Phaser.Scene {
   }
 
   private createSparkles(): void {
-    // Simple sparkle effect using tweens
     for (let i = 0; i < 20; i++) {
       const x = Phaser.Math.Between(50, GAME_WIDTH - 50);
       const y = Phaser.Math.Between(50, GAME_HEIGHT - 50);
