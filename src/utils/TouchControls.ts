@@ -20,25 +20,14 @@ export class TouchControls {
   private onDrag: ((dx: number, dy: number) => void) | null = null;
   private isDragging: boolean = false;
 
+  private boundPointerDown: (pointer: Phaser.Input.Pointer) => void;
+  private boundPointerMove: (pointer: Phaser.Input.Pointer) => void;
+  private boundPointerUp: (pointer: Phaser.Input.Pointer) => void;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.setupListeners();
-  }
 
-  setTapHandler(handler: (x: number, y: number) => void): void {
-    this.onTap = handler;
-  }
-
-  setLongPressHandler(handler: (x: number, y: number) => void): void {
-    this.onLongPress = handler;
-  }
-
-  setDragHandler(handler: (dx: number, dy: number) => void): void {
-    this.onDrag = handler;
-  }
-
-  private setupListeners(): void {
-    this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+    this.boundPointerDown = (pointer: Phaser.Input.Pointer) => {
       // Don't trigger board events in bottom control area or top header
       if (pointer.y > 1020 || pointer.y < 120) {
         return;
@@ -59,9 +48,9 @@ export class TouchControls {
           }
         }
       );
-    });
+    };
 
-    this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+    this.boundPointerMove = (pointer: Phaser.Input.Pointer) => {
       if (!pointer.isDown) return;
 
       const dx = pointer.x - this.startX;
@@ -80,9 +69,9 @@ export class TouchControls {
           this.onDrag(pointer.x - pointer.prevPosition.x, pointer.y - pointer.prevPosition.y);
         }
       }
-    });
+    };
 
-    this.scene.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
+    this.boundPointerUp = (pointer: Phaser.Input.Pointer) => {
       // Cancel long press timer
       if (this.longPressTimer) {
         this.longPressTimer.destroy();
@@ -98,15 +87,37 @@ export class TouchControls {
 
       this.isDragging = false;
       this.isLongPress = false;
-    });
+    };
+
+    this.setupListeners();
+  }
+
+  setTapHandler(handler: (x: number, y: number) => void): void {
+    this.onTap = handler;
+  }
+
+  setLongPressHandler(handler: (x: number, y: number) => void): void {
+    this.onLongPress = handler;
+  }
+
+  setDragHandler(handler: (dx: number, dy: number) => void): void {
+    this.onDrag = handler;
+  }
+
+  private setupListeners(): void {
+    this.scene.input.on('pointerdown', this.boundPointerDown);
+    this.scene.input.on('pointermove', this.boundPointerMove);
+    this.scene.input.on('pointerup', this.boundPointerUp);
   }
 
   destroy(): void {
     if (this.longPressTimer) {
       this.longPressTimer.destroy();
+      this.longPressTimer = null;
     }
-    this.scene.input.off('pointerdown');
-    this.scene.input.off('pointermove');
-    this.scene.input.off('pointerup');
+    // CRITICAL FIX: Only remove bound handlers, NEVER remove all listeners!
+    this.scene.input.off('pointerdown', this.boundPointerDown);
+    this.scene.input.off('pointermove', this.boundPointerMove);
+    this.scene.input.off('pointerup', this.boundPointerUp);
   }
 }

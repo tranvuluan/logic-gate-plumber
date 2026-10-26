@@ -132,13 +132,13 @@
       }
     }
   </style>
-  <script type="module" crossorigin src="./assets/index-DXaMpm6k.js"></script>
+  <script type="module" crossorigin src="./assets/index-DYddmJ-_.js"></script>
 </head>
 <body>
-  <a id="apk-download-btn" href="/LogicGatePlumber.apk" download="LogicGatePlumber.apk" title="Tải file APK về điện thoại cài đặt">
-    ⬇️ Tải file APK (4.2MB)
+  <a id="apk-download-btn" href="./LogicGatePlumber.apk" download="LogicGatePlumber.apk" title="Tải file APK về điện thoại cài đặt">
+    ⬇️ Tải file APK (12.3MB)
   </a>
-  <a id="qr-float-btn" href="/qr.html" title="Mở trang quét QR để chuyển sang điện thoại">
+  <a id="qr-float-btn" href="./qr.html" title="Mở trang quét QR để chuyển sang điện thoại">
     📱 Quét mã QR Mobile
   </a>
   <div id="game-container"></div>
@@ -146,7 +146,7 @@
     // Register PWA Service Worker for Offline & Home Screen Install
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('./sw.js')
           .then((reg) => console.log('✅ PWA Service Worker Registered:', reg.scope))
           .catch((err) => console.log('PWA Service Worker Registration Failed:', err));
       });

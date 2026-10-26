@@ -185,11 +185,11 @@ export class GameScene extends Phaser.Scene {
     this.setupVirtualControls();
     this.setupKeyboardControls();
 
+    // Bottom UI Bar (created before signal propagation)
+    this.drawBottomUI();
+
     // Initial signal propagation
     this.propagateSignals();
-
-    // Bottom UI Bar
-    this.drawBottomUI();
   }
 
   private randomizeRotations(): void {
@@ -197,7 +197,10 @@ export class GameScene extends Phaser.Scene {
       for (let c = 0; c < this.gridWidth; c++) {
         const cell = this.grid[r][c];
         if (cell && !cell.fixed && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
-          if (cell.rotation === cell.correctRotation) {
+          if (cell.type === GateType.WIRE) {
+            // Straight wire: ensure initial orientation is perpendicular to correctRotation
+            cell.rotation = (cell.correctRotation + 1) % 2;
+          } else if (cell.rotation === cell.correctRotation) {
             cell.rotation = (cell.correctRotation + Phaser.Math.Between(1, 3)) % 4;
           }
         }
@@ -408,6 +411,15 @@ export class GameScene extends Phaser.Scene {
 
         container.add([gateGraphics, signalIndicator, label, lockIcon]);
         this.boardContainer.add(container);
+
+        // Direct interactive hit area for instant, bulletproof cell tapping
+        const hitArea = new Phaser.Geom.Rectangle(-CELL_SIZE / 2, -CELL_SIZE / 2, CELL_SIZE, CELL_SIZE);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        const cellR = r;
+        const cellC = c;
+        container.on('pointerdown', () => {
+          this.handleCellTap(cellR, cellC);
+        });
 
         this.cellSprites[r][c] = {
           container,
@@ -1664,7 +1676,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Smoothly load next level without camera fade black screen glitch.
+   * Smoothly load next level without camera fade black screen glitch or input freeze.
    */
   private loadNextLevel(nextLevelId: number): void {
     if (nextLevelId > 20) {
@@ -1673,13 +1685,13 @@ export class GameScene extends Phaser.Scene {
     }
     this.cleanUpResources();
     this.cameras.main.resetFX();
-    this.scene.restart({ levelId: nextLevelId });
+    this.scene.start('GameScene', { levelId: nextLevelId });
   }
 
   private restartCurrentLevel(): void {
     this.cleanUpResources();
     this.cameras.main.resetFX();
-    this.scene.restart({ levelId: this.levelId });
+    this.scene.start('GameScene', { levelId: this.levelId });
   }
 
   private cleanupAndNavigate(sceneKey: string): void {
@@ -1690,7 +1702,6 @@ export class GameScene extends Phaser.Scene {
 
   private cleanUpResources(): void {
     this.tweens.killAll();
-    this.time.removeAllEvents();
     if (this.touchControls) {
       this.touchControls.destroy();
     }

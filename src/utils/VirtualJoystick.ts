@@ -19,6 +19,10 @@ export class VirtualJoystick {
   private baseY: number;
   private currentPointer: Phaser.Input.Pointer | null = null;
 
+  private boundPointerDown: (pointer: Phaser.Input.Pointer) => void;
+  private boundPointerMove: (pointer: Phaser.Input.Pointer) => void;
+  private boundPointerUp: (pointer: Phaser.Input.Pointer) => void;
+
   public direction: JoystickDirection = {
     x: 0,
     y: 0,
@@ -32,6 +36,38 @@ export class VirtualJoystick {
     this.baseX = x;
     this.baseY = y;
     this.radius = radius;
+
+    this.boundPointerDown = (pointer: Phaser.Input.Pointer) => {
+      const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, this.baseX, this.baseY);
+      if (dist <= this.radius * 1.4 && !this.currentPointer) {
+        this.currentPointer = pointer;
+        this.updateThumb(pointer.x, pointer.y);
+      }
+    };
+
+    this.boundPointerMove = (pointer: Phaser.Input.Pointer) => {
+      if (this.currentPointer && this.currentPointer.id === pointer.id) {
+        this.updateThumb(pointer.x, pointer.y);
+      }
+    };
+
+    this.boundPointerUp = (pointer: Phaser.Input.Pointer) => {
+      if (this.currentPointer && this.currentPointer.id === pointer.id) {
+        this.currentPointer = null;
+        this.direction.x = 0;
+        this.direction.y = 0;
+        this.direction.force = 0;
+        this.direction.isDown = false;
+
+        this.scene.tweens.add({
+          targets: this.thumb,
+          x: 0,
+          y: 0,
+          duration: 100,
+          ease: 'Sine.easeOut',
+        });
+      }
+    };
 
     this.createGraphics();
     this.setupEvents();
@@ -63,40 +99,10 @@ export class VirtualJoystick {
     const hitArea = new Phaser.Geom.Circle(0, 0, this.radius * 1.5);
     this.base.setInteractive(hitArea, Phaser.Geom.Circle.Contains);
 
-    this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      const dist = Phaser.Math.Distance.Between(pointer.x, pointer.y, this.baseX, this.baseY);
-      if (dist <= this.radius * 1.4 && !this.currentPointer) {
-        this.currentPointer = pointer;
-        this.updateThumb(pointer.x, pointer.y);
-      }
-    });
-
-    this.scene.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (this.currentPointer && this.currentPointer.id === pointer.id) {
-        this.updateThumb(pointer.x, pointer.y);
-      }
-    });
-
-    const resetJoystick = (pointer: Phaser.Input.Pointer) => {
-      if (this.currentPointer && this.currentPointer.id === pointer.id) {
-        this.currentPointer = null;
-        this.direction.x = 0;
-        this.direction.y = 0;
-        this.direction.force = 0;
-        this.direction.isDown = false;
-
-        this.scene.tweens.add({
-          targets: this.thumb,
-          x: 0,
-          y: 0,
-          duration: 100,
-          ease: 'Sine.easeOut',
-        });
-      }
-    };
-
-    this.scene.input.on('pointerup', resetJoystick);
-    this.scene.input.on('pointerupoutside', resetJoystick);
+    this.scene.input.on('pointerdown', this.boundPointerDown);
+    this.scene.input.on('pointermove', this.boundPointerMove);
+    this.scene.input.on('pointerup', this.boundPointerUp);
+    this.scene.input.on('pointerupoutside', this.boundPointerUp);
   }
 
   private updateThumb(pointerX: number, pointerY: number): void {
@@ -124,6 +130,10 @@ export class VirtualJoystick {
   }
 
   public destroy(): void {
+    this.scene.input.off('pointerdown', this.boundPointerDown);
+    this.scene.input.off('pointermove', this.boundPointerMove);
+    this.scene.input.off('pointerup', this.boundPointerUp);
+    this.scene.input.off('pointerupoutside', this.boundPointerUp);
     this.container.destroy();
   }
 }

@@ -14,9 +14,9 @@
   <meta name="description" content="Logic Gate Plumber - Game giải đố xoay cổng logic số trên di động" />
 
   <!-- App Icons & Manifest -->
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
 
   <title>Logic Gate Plumber - Nối Mạch Kỹ Thuật Số</title>
   <style>
@@ -134,19 +134,19 @@
   </style>
 </head>
 <body>
-  <a id="apk-download-btn" href="/LogicGatePlumber.apk" download="LogicGatePlumber.apk" title="Tải file APK về điện thoại cài đặt">
-    ⬇️ Tải file APK (4.2MB)
+  <a id="apk-download-btn" href="./LogicGatePlumber.apk" download="LogicGatePlumber.apk" title="Tải file APK về điện thoại cài đặt">
+    ⬇️ Tải file APK (12.3MB)
   </a>
-  <a id="qr-float-btn" href="/qr.html" title="Mở trang quét QR để chuyển sang điện thoại">
+  <a id="qr-float-btn" href="./qr.html" title="Mở trang quét QR để chuyển sang điện thoại">
     📱 Quét mã QR Mobile
   </a>
   <div id="game-container"></div>
-  <script type="module" src="/src/main.ts"></script>
+  <script type="module" src="./src/main.ts"></script>
   <script>
     // Register PWA Service Worker for Offline & Home Screen Install
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
+        navigator.serviceWorker.register('./sw.js')
           .then((reg) => console.log('✅ PWA Service Worker Registered:', reg.scope))
           .catch((err) => console.log('PWA Service Worker Registration Failed:', err));
       });
