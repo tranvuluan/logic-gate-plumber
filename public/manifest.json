@@ -1,0 +1,37 @@
+{
+  "name": "Logic Gate Plumber - Nối Mạch Kỹ Thuật Số",
+  "short_name": "Gate Plumber",
+  "description": "Game giải đố xoay cổng logic và nối mạch điện tử số trên di động",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070e1b",
+  "theme_color": "#070e1b",
+  "categories": ["games", "puzzle", "education"],
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

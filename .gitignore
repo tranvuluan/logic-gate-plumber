@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Local tools & SDKs (OpenJDK, Android SDK, Cloudflared)
+tools/
+*.log
+
+# Build outputs (dist can be built via npm run build or GitHub Actions)
+.dist
+
+# Android / Gradle build caches
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/*.iml
+android/captures/
+
+# OS generated
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor directories and files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

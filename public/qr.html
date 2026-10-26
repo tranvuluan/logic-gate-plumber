@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tải File APK & Chơi Logic Gate Plumber Trên Điện Thoại</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #070e1b;
+      color: #E2F1FF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background: rgba(10, 25, 47, 0.95);
+      border: 2px solid #00F0FF;
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.3), inset 0 0 15px rgba(0, 240, 255, 0.1);
+      border-radius: 16px;
+      padding: 28px 24px;
+      max-width: 480px;
+      width: 100%;
+    }
+    h1 {
+      color: #00F0FF;
+      font-size: 22px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+    }
+    .subtitle {
+      color: #8892b0;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+    .btn-apk-big {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: linear-gradient(135deg, #00FF9D, #00B8D4);
+      color: #060d18;
+      font-weight: 900;
+      font-size: 16px;
+      padding: 14px 20px;
+      border-radius: 10px;
+      text-decoration: none;
+      box-shadow: 0 0 20px rgba(0, 255, 157, 0.5);
+      margin-bottom: 20px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .btn-apk-big:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 30px rgba(0, 255, 157, 0.8);
+    }
+    .tab-bar {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 16px;
+      background: #060d18;
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid #1E2D4A;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 8px 8px;
+      border: none;
+      background: transparent;
+      color: #8892b0;
+      font-size: 12px;
+      font-weight: bold;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      background: #00F0FF;
+      color: #060d18;
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+    }
+    .qr-container {
+      background: #FFFFFF;
+      padding: 12px;
+      border-radius: 12px;
+      display: inline-block;
+      margin-bottom: 16px;
+      box-shadow: 0 0 20px rgba(0, 255, 157, 0.4);
+    }
+    .qr-container img {
+      display: block;
+      width: 230px;
+      height: 230px;
+    }
+    .link-box {
+      background: #060d18;
+      border: 1px dashed #00F0FF;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 13px;
+      color: #00FF9D;
+      word-break: break-all;
+      margin-bottom: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .btn-copy {
+      background: #1E2D4A;
+      color: #00F0FF;
+      border: 1px solid #00F0FF;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .btn-copy:hover {
+      background: #00F0FF;
+      color: #060d18;
+    }
+    .steps {
+      text-align: left;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 14px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #ccd6f6;
+      margin-bottom: 20px;
+    }
+    .steps ol {
+      padding-left: 20px;
+    }
+    .steps li {
+      margin-bottom: 6px;
+    }
+    .btn-play {
+      display: inline-block;
+      width: 100%;
+      background: #1E2D4A;
+      color: #00F0FF;
+      border: 1px solid #00F0FF;
+      text-decoration: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: bold;
+      font-size: 14px;
+      letter-spacing: 1px;
+      transition: all 0.2s;
+    }
+    .btn-play:hover {
+      background: #00F0FF;
+      color: #060d18;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>⚡ TẢI APK & KẾT NỐI ⚡</h1>
+    <p class="subtitle">Game giải đố xoay cổng logic số trên Mobile</p>
+
+    <!-- Nút Tải APK trực tiếp -->
+    <a href="/LogicGatePlumber.apk" download="LogicGatePlumber.apk" class="btn-apk-big">
+      <span>⬇️</span> TẢI FILE APK ANDROID (4.2 MB)
+    </a>
+
+    <!-- Tab chọn chế độ -->
+    <div class="tab-bar">
+      <button id="tab-apk" class="tab-btn active" onclick="switchMode('apk')">Mã QR Tải APK</button>
+      <button id="tab-public" class="tab-btn" onclick="switchMode('public')">Chơi Web (5G/4G)</button>
+      <button id="tab-lan" class="tab-btn" onclick="switchMode('lan')">Mạng LAN Wi-Fi</button>
+    </div>
+
+    <!-- QR Code Container -->
+    <div class="qr-container">
+      <img id="qr-img" src="/qr-apk.png" alt="QR Code" />
+    </div>
+
+    <!-- Link URL -->
+    <div class="link-box">
+      <span id="link-text">https://applicant-dame-fly-basename.trycloudflare.com/LogicGatePlumber.apk</span>
+      <button class="btn-copy" onclick="copyLink()">Sao chép</button>
+    </div>
+
+    <!-- Hướng dẫn -->
+    <div class="steps">
+      <ol id="instructions-list">
+        <li><strong>Bước 1:</strong> Dùng điện thoại quét mã QR hoặc bấm nút Tải APK màu xanh ở trên.</li>
+        <li><strong>Bước 2:</strong> Điện thoại sẽ tải file <code>LogicGatePlumber.apk</code> về máy.</li>
+        <li><strong>Bước 3:</strong> Mở file và chọn "Cài đặt" (cho phép nguồn này nếu máy hỏi). Cài xong là có app native chơi offline 100%!</li>
+      </ol>
+    </div>
+
+    <a href="/" class="btn-play">▶ CHƠI TRÊN TRÌNH DUYỆT NÀY</a>
+  </div>
+
+  <script>
+    const apkUrl = 'https://applicant-dame-fly-basename.trycloudflare.com/LogicGatePlumber.apk';
+    const publicUrl = 'https://applicant-dame-fly-basename.trycloudflare.com/';
+    const lanUrl = 'http://172.16.16.222:3000/';
+
+    function switchMode(mode) {
+      const qrImg = document.getElementById('qr-img');
+      const linkText = document.getElementById('link-text');
+      const tabApk = document.getElementById('tab-apk');
+      const tabPublic = document.getElementById('tab-public');
+      const tabLan = document.getElementById('tab-lan');
+      const instructions = document.getElementById('instructions-list');
+
+      tabApk.classList.remove('active');
+      tabPublic.classList.remove('active');
+      tabLan.classList.remove('active');
+
+      if (mode === 'apk') {
+        qrImg.src = '/qr-apk.png';
+        linkText.textContent = apkUrl;
+        tabApk.classList.add('active');
+        instructions.innerHTML = `
+          <li><strong>Bước 1:</strong> Quét mã QR bằng Camera điện thoại.</li>
+          <li><strong>Bước 2:</strong> Điện thoại tự động tải file <code>LogicGatePlumber.apk</code> về máy.</li>
+          <li><strong>Bước 3:</strong> Bấm vào file vừa tải để cài đặt và chơi ngay lập tức không cần mạng!</li>
+        `;
+      } else if (mode === 'public') {
+        qrImg.src = '/qr-public.png';
+        linkText.textContent = publicUrl;
+        tabPublic.classList.add('active');
+        instructions.innerHTML = `
+          <li><strong>Bước 1:</strong> Quét mã QR để mở bản Web qua mạng 4G/5G hoặc bất kỳ đâu.</li>
+          <li><strong>Bước 2:</strong> Có thể cài đặt thành PWA Full màn hình qua menu trình duyệt.</li>
+        `;
+      } else {
+        qrImg.src = '/qr-lan.png';
+        linkText.textContent = lanUrl;
+        tabLan.classList.add('active');
+        instructions.innerHTML = `
+          <li><strong>Bước 1:</strong> Kết nối điện thoại cùng Wi-Fi / Hotspot với máy tính.</li>
+          <li><strong>Bước 2:</strong> Quét mã QR để truy cập trực tiếp qua mạng nội bộ LAN siêu tốc.</li>
+        `;
+      }
+    }
+
+    function copyLink() {
+      const text = document.getElementById('link-text').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Đã sao chép liên kết: ' + text);
+      });
+    }
+  </script>
+</body>
+</html>
