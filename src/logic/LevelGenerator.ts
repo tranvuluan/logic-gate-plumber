@@ -85,7 +85,7 @@ export function getLevels(): LevelDefinition[] {
         { r: 1, c: 1, type: GateType.OR, rotation: 2, correctRotation: 0, fixed: false },
         { r: 1, c: 2, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
         { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 3, fixed: false },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
@@ -137,7 +137,7 @@ export function getLevels(): LevelDefinition[] {
         { r: 1, c: 1, type: GateType.AND, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 2, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
         { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 3, fixed: false },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
@@ -162,12 +162,12 @@ export function getLevels(): LevelDefinition[] {
         { r: 0, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
 
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 2, c: 1, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
-        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 3, fixed: false },
-
         { r: 1, c: 2, type: GateType.AND, rotation: 3, correctRotation: 0, fixed: false },
         { r: 1, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
+
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
@@ -191,12 +191,12 @@ export function getLevels(): LevelDefinition[] {
         { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 3, fixed: false },
-
         { r: 1, c: 1, type: GateType.XOR, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
+
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
@@ -220,21 +220,21 @@ export function getLevels(): LevelDefinition[] {
         { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
 
-        { r: 1, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 1, c: 1, type: GateType.OR, rotation: 3, correctRotation: 0, fixed: false },
+        { r: 1, c: 1, type: GateType.OR, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 2, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
-        { r: 2, c: 1, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
-        { r: 2, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
+        { r: 2, c: 2, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
         { r: 2, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
         { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 3, c: 1, type: GateType.NOT, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 3, fixed: false },
+        { r: 3, c: 1, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 0 },
-        { row: 1, col: 0, value: 1 },
+        { row: 2, col: 0, value: 1 },
         { row: 3, col: 0, value: 0 },
       ],
       leds: [{ row: 2, col: 3 }],
@@ -264,19 +264,18 @@ export function getLevels(): LevelDefinition[] {
         { r: 1, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
         { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 2, c: 1, type: GateType.NOT, rotation: 3, correctRotation: 0, fixed: false },
-        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
 
         { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 3, c: 1, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 2, fixed: false },
-        { r: 3, c: 2, type: GateType.OR, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 3, c: 1, type: GateType.NOT, rotation: 3, correctRotation: 0, fixed: false },
+        { r: 3, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
         { row: 2, col: 0, value: 0 },
-        { row: 3, col: 0, value: 1 },
+        { row: 3, col: 0, value: 0 },
       ],
       leds: [
         { row: 0, col: 4 },
@@ -297,23 +296,26 @@ export function getLevels(): LevelDefinition[] {
       tutorialText: '🔬 Mạch bán cộng trong máy tính: Nhánh trên tính Tổng (XOR), nhánh dưới tính Nhớ (AND)!',
       timeLimit: 90,
       cells: createGrid(4, 4, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 0, c: 1, type: GateType.SPLIT, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 0, c: 2, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 0, fixed: false },
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
 
-        { r: 1, c: 2, type: GateType.XOR, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 1, c: 1, type: GateType.XOR, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 1, c: 2, type: GateType.SPLIT, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
         { r: 2, c: 2, type: GateType.AND, rotation: 1, correctRotation: 0, fixed: false },
         { r: 2, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 3, c: 1, type: GateType.SPLIT, rotation: 0, correctRotation: 3, fixed: false },
-        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 3, fixed: false },
+        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 3, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
-        { row: 3, col: 0, value: 0 },
+        { row: 2, col: 0, value: 0 },
+        { row: 3, col: 0, value: 1 },
       ],
       leds: [
         { row: 1, col: 3 },
@@ -333,20 +335,20 @@ export function getLevels(): LevelDefinition[] {
       tutorialText: '⚡ Cả hai nguồn đều là 0! Dùng 2 cổng NOT để biến đổi trước khi hội tụ vào cổng AND.',
       timeLimit: 90,
       cells: createGrid(4, 4, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
         { r: 0, c: 2, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
         { r: 1, c: 2, type: GateType.AND, rotation: 3, correctRotation: 0, fixed: false },
         { r: 1, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
-        { r: 3, c: 1, type: GateType.NOT, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 3, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.NOT, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 0 },
-        { row: 3, col: 0, value: 0 },
+        { row: 2, col: 0, value: 0 },
       ],
       leds: [{ row: 1, col: 3 }],
     },
@@ -363,23 +365,24 @@ export function getLevels(): LevelDefinition[] {
       tutorialText: '🎯 Cổng XOR ghép tầng kiểm tra số bit 1 là chẵn hay lẻ trong truyền tin viễn thông.',
       timeLimit: 95,
       cells: createGrid(4, 4, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 0, fixed: false },
 
-        { r: 1, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
-        { r: 1, c: 1, type: GateType.XOR, rotation: 2, correctRotation: 0, fixed: false },    // 1 XOR 0 = 1
+        { r: 1, c: 1, type: GateType.XOR, rotation: 2, correctRotation: 0, fixed: false },
         { r: 1, c: 2, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
-        { r: 2, c: 2, type: GateType.XOR, rotation: 1, correctRotation: 0, fixed: false },    // 1 XOR 0 = 1
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
+        { r: 2, c: 2, type: GateType.XOR, rotation: 1, correctRotation: 0, fixed: false },
         { r: 2, c: 3, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
+        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 3, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 3, fixed: false },
+        { r: 3, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
-        { row: 1, col: 0, value: 0 },
+        { row: 2, col: 0, value: 0 },
         { row: 3, col: 0, value: 0 },
       ],
       leds: [{ row: 2, col: 3 }],
@@ -397,25 +400,27 @@ export function getLevels(): LevelDefinition[] {
       tutorialText: '📡 Dùng cổng NOT và 2 cổng AND để định tuyến tín hiệu đúng vào cổng OR cuối!',
       timeLimit: 100,
       cells: createGrid(4, 5, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // Dữ liệu A (1)
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
 
-        { r: 1, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // Chọn (0)
-        { r: 1, c: 1, type: GateType.NOT, rotation: 1, correctRotation: 0, fixed: false },   // Đảo 0 -> 1
-        { r: 1, c: 2, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },   // 1 AND 1 = 1
+        { r: 1, c: 2, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
         { r: 1, c: 3, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
-        { r: 2, c: 3, type: GateType.OR, rotation: 2, correctRotation: 0, fixed: false },    // Ra 1
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.NOT, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
+        { r: 2, c: 3, type: GateType.OR, rotation: 2, correctRotation: 0, fixed: false },
         { r: 2, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // Dữ liệu B (0)
+        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 3, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 3, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 3, fixed: false },
+        { r: 3, c: 3, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
-        { row: 1, col: 0, value: 0 },
+        { row: 2, col: 0, value: 0 },
         { row: 3, col: 0, value: 0 },
       ],
       leds: [{ row: 2, col: 4 }],
@@ -434,23 +439,22 @@ export function getLevels(): LevelDefinition[] {
       timeLimit: 105,
       cells: createGrid(4, 5, [
         { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
-        { r: 0, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 0, c: 1, type: GateType.NOT, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 2, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 0, fixed: false },
+        { r: 0, c: 3, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 3, fixed: false },
         { r: 0, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 1, c: 2, type: GateType.NOT, rotation: 1, correctRotation: 1, fixed: false },
-        { r: 1, c: 3, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 1, fixed: false },
-
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 2, fixed: false },
-        { r: 2, c: 3, type: GateType.WIRE, rotation: 0, correctRotation: 1, fixed: false },
+        { r: 1, c: 2, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 2, fixed: false },
+        { r: 1, c: 3, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
 
         { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 3, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 3, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 3, fixed: false },
+        { r: 3, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 3, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
       ]),
       sources: [
-        { row: 0, col: 0, value: 1 },
+        { row: 0, col: 0, value: 0 },
         { row: 3, col: 0, value: 1 },
       ],
       leds: [
@@ -471,18 +475,16 @@ export function getLevels(): LevelDefinition[] {
       tutorialText: '⚡ Cổng NAND (AND + NOT) và NOR (OR + NOT) là hai cổng nền tảng cấu tạo chip hiện đại.',
       timeLimit: 105,
       cells: createGrid(4, 5, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
 
         { r: 1, c: 1, type: GateType.AND, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 2, type: GateType.NOT, rotation: 3, correctRotation: 0, fixed: false },
+        { r: 1, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 3, fixed: false },
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
-
-        { r: 3, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 3, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 2, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
@@ -500,26 +502,29 @@ export function getLevels(): LevelDefinition[] {
       subtitle: 'Xử lý 3 đầu vào đồng thời',
       gridWidth: 5,
       gridHeight: 5,
-      tutorialText: '💻 3 đầu vào A, B, và Cin: Thắp sáng cả LED Tổng (Sum) và LED Nhớ (Carry)!',
+      tutorialText: '💻 3 đầu vào: Thắp sáng cả LED Tổng (Sum) và LED Nhớ (Carry)!',
       timeLimit: 120,
       cells: createGrid(5, 5, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
         { r: 1, c: 1, type: GateType.XOR, rotation: 3, correctRotation: 0, fixed: false },
-        { r: 1, c: 2, type: GateType.SPLIT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 1, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 3, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.SPLIT, rotation: 0, correctRotation: 2, fixed: false },
+        { r: 2, c: 2, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 2, c: 3, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 0, fixed: false },
 
-        { r: 3, c: 2, type: GateType.AND, rotation: 1, correctRotation: 0, fixed: false },
-        { r: 3, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 3, c: 3, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
         { r: 3, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 4, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 4, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 3, fixed: false },
+        { r: 4, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 4, c: 1, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 4, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 4, c: 3, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
@@ -541,31 +546,36 @@ export function getLevels(): LevelDefinition[] {
       subtitle: 'Kích hoạt chân ra tương ứng',
       gridWidth: 5,
       gridHeight: 5,
-      tutorialText: '🎛️ Giải mã tín hiệu nhị phân: Biến tổ hợp 2 bit đầu vào thành tín hiệu sáng đúng 3 đèn LED.',
+      tutorialText: '🎛️ Giải mã tín hiệu nhị phân: Biến tổ hợp đầu vào thành tín hiệu sáng đúng 3 đèn LED.',
       timeLimit: 120,
       cells: createGrid(5, 5, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.SPLIT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 0, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 1, c: 1, type: GateType.WIRE, rotation: 0, correctRotation: 1, fixed: false },
-        { r: 1, c: 2, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 1, c: 1, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 1, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 1, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 2, c: 1, type: GateType.SPLIT, rotation: 3, correctRotation: 0, fixed: false },
-        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 1, correctRotation: 3, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.SPLIT, rotation: 0, correctRotation: 2, fixed: false },
+        { r: 2, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
 
         { r: 3, c: 2, type: GateType.OR, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 3, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 4, c: 1, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 2, fixed: false },
-        { r: 4, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 3, fixed: false },
+        { r: 4, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 4, c: 1, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 4, c: 2, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
         { row: 2, col: 0, value: 1 },
+        { row: 4, col: 0, value: 0 },
       ],
       leds: [
         { row: 0, col: 4 },
@@ -580,14 +590,14 @@ export function getLevels(): LevelDefinition[] {
     {
       id: 19,
       name: 'Màn 19: Ma Trận Logic',
-      subtitle: 'Thử thách 4 đèn LED phân tầng',
+      subtitle: 'Thử thách 3 đèn LED phân tầng',
       gridWidth: 5,
       gridHeight: 5,
-      tutorialText: '🧩 Ma trận 5x5 phức tạp: Xoay các cổng AND, OR, XOR để thắp sáng toàn bộ 4 đèn LED!',
+      tutorialText: '🧩 Ma trận 5x5 phức tạp: Xoay các cổng AND, NOT để thắp sáng toàn bộ 3 đèn LED!',
       timeLimit: 135,
       cells: createGrid(5, 5, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 0, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 0, c: 1, type: GateType.SPLIT, rotation: 2, correctRotation: 0, fixed: false },
         { r: 0, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
@@ -597,22 +607,18 @@ export function getLevels(): LevelDefinition[] {
         { r: 1, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 3, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
 
-        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 3, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
-
-        { r: 4, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
+        { r: 4, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 4, c: 1, type: GateType.NOT, rotation: 2, correctRotation: 0, fixed: false },
-        { r: 4, c: 2, type: GateType.OR, rotation: 1, correctRotation: 0, fixed: false },
+        { r: 4, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 4, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 4, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
         { row: 2, col: 0, value: 1 },
-        { row: 3, col: 0, value: 1 },
         { row: 4, col: 0, value: 0 },
       ],
       leds: [
@@ -634,7 +640,7 @@ export function getLevels(): LevelDefinition[] {
       tutorialText: '👑 MÀN ĐỈNH CAO: Tích hợp đầy đủ AND, OR, XOR, NOT, SPLIT để hoàn thành cỗ máy logic hoàn hảo!',
       timeLimit: 150,
       cells: createGrid(5, 5, [
-        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
+        { r: 0, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
         { r: 0, c: 1, type: GateType.SPLIT, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 2, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 0, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
@@ -645,20 +651,20 @@ export function getLevels(): LevelDefinition[] {
         { r: 1, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 1, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 0
-        { r: 2, c: 1, type: GateType.NOT, rotation: 3, correctRotation: 0, fixed: false },
-        { r: 2, c: 2, type: GateType.AND, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 2, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 2, c: 1, type: GateType.SPLIT, rotation: 0, correctRotation: 2, fixed: false },
+        { r: 2, c: 2, type: GateType.NOT, rotation: 3, correctRotation: 0, fixed: false },
         { r: 2, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 2, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
-        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true }, // 1
-        { r: 3, c: 1, type: GateType.SPLIT, rotation: 2, correctRotation: 0, fixed: false },
+        { r: 3, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true },
+        { r: 3, c: 1, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 0, fixed: false },
         { r: 3, c: 2, type: GateType.OR, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 3, type: GateType.WIRE, rotation: 1, correctRotation: 0, fixed: false },
         { r: 3, c: 4, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true },
 
         { r: 4, c: 1, type: GateType.WIRE_CORNER, rotation: 0, correctRotation: 2, fixed: false },
-        { r: 4, c: 2, type: GateType.WIRE_CORNER, rotation: 2, correctRotation: 3, fixed: false },
+        { r: 4, c: 2, type: GateType.WIRE_CORNER, rotation: 3, correctRotation: 1, fixed: false },
       ]),
       sources: [
         { row: 0, col: 0, value: 1 },
