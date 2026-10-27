@@ -155,6 +155,23 @@ export class GameScene extends Phaser.Scene {
     const maxDim = Math.max(this.gridWidth, this.gridHeight);
     this.cellSize = maxDim > 6 ? Math.min(CELL_SIZE, Math.floor(660 / maxDim)) : CELL_SIZE;
 
+    // Switch to Chapter-Specific Cyberpunk Music Theme
+    let chapterId = 1;
+    if (this.isEndless || this.levelId > 100) {
+      chapterId = 6;
+    } else if (this.levelId >= 86) {
+      chapterId = 5;
+    } else if (this.levelId >= 61) {
+      chapterId = 4;
+    } else if (this.levelId >= 36) {
+      chapterId = 3;
+    } else if (this.levelId >= 16) {
+      chapterId = 2;
+    } else {
+      chapterId = 1;
+    }
+    audio.setChapterBGM(chapterId);
+
     // Deep clone grid
     this.grid = level.cells.map((row) =>
       row.map((cell) =>

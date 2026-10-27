@@ -52,6 +52,7 @@ export class LevelSelectScene extends Phaser.Scene {
         break;
       }
     }
+    audio.setChapterBGM(this.currentChapter);
 
     // Top Header Bar
     const headerBg = this.add.graphics();
@@ -190,6 +191,7 @@ export class LevelSelectScene extends Phaser.Scene {
       audio.playButtonClick();
       if (this.currentChapter !== chapterId) {
         this.currentChapter = chapterId;
+        audio.setChapterBGM(chapterId);
         this.scrollY = 0;
         this.scrollContainer.y = 215;
         this.updateTabStyles();

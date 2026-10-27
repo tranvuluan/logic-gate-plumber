@@ -24,9 +24,10 @@ export class MenuScene extends Phaser.Scene {
     this.createAudioToggle();
 
     // Auto-resume audio & ambient BGM on first user touch/click
+    audio.setChapterBGM(0);
     this.input.once('pointerdown', () => {
       audio.resume();
-      audio.startBGM();
+      audio.setChapterBGM(0);
     });
 
     // Title group
