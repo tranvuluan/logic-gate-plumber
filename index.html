@@ -143,14 +143,17 @@
   <div id="game-container"></div>
   <script type="module" src="./src/main.ts"></script>
   <script>
-    // Hide APK download button and QR button if running inside native Android App (Capacitor) or standalone mode
+    // Hide APK download button and QR button if running inside native Android App (Capacitor), iframe (CrazyGames), or standalone mode
     (function() {
       function detectAndHideOnNative() {
         var isCapacitor = !!(window.Capacitor && (typeof window.Capacitor.isNativePlatform === 'function' ? window.Capacitor.isNativePlatform() : window.Capacitor.platform !== 'web'));
         var isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         var isFile = window.location.protocol === 'file:' || window.location.protocol === 'capacitor:';
         var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        var isAndroidApp = isCapacitor || isLocalHost || isFile || isStandalone || /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
+        var isIframe = false;
+        try { isIframe = window.self !== window.top; } catch(e) { isIframe = true; }
+        var isCrazyGames = window.location.hostname.indexOf('crazygames') !== -1 || window.location.hostname.indexOf('gamepix') !== -1;
+        var isAndroidApp = isCapacitor || isLocalHost || isFile || isStandalone || isIframe || isCrazyGames || /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
 
         if (isAndroidApp) {
           var apkBtn = document.getElementById('apk-download-btn');
@@ -159,10 +162,9 @@
           if (qrBtn) qrBtn.style.setProperty('display', 'none', 'important');
         }
       }
+      detectAndHideOnNative();
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', detectAndHideOnNative);
-      } else {
-        detectAndHideOnNative();
       }
       window.addEventListener('load', detectAndHideOnNative);
     })();
