@@ -15,7 +15,7 @@ export class TouchControls {
   private startX: number = 0;
   private startY: number = 0;
   private isLongPress: boolean = false;
-  private onTap: ((x: number, y: number) => void) | null = null;
+  private onTap: ((x: number, y: number, pointer: Phaser.Input.Pointer) => void) | null = null;
   private onLongPress: ((x: number, y: number) => void) | null = null;
   private onDrag: ((dx: number, dy: number) => void) | null = null;
   private isDragging: boolean = false;
@@ -81,7 +81,7 @@ export class TouchControls {
       if (!this.isLongPress && !this.isDragging) {
         // It's a tap
         if (this.onTap) {
-          this.onTap(pointer.x, pointer.y);
+          this.onTap(pointer.x, pointer.y, pointer);
         }
       }
 
@@ -92,7 +92,7 @@ export class TouchControls {
     this.setupListeners();
   }
 
-  setTapHandler(handler: (x: number, y: number) => void): void {
+  setTapHandler(handler: (x: number, y: number, pointer: Phaser.Input.Pointer) => void): void {
     this.onTap = handler;
   }
 

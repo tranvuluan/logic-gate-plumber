@@ -57,6 +57,9 @@ export class GameScene extends Phaser.Scene {
   // Move Limit & Par Moves (3-Star Rating)
   private movesCount: number = 0;
   private parMoves: number = 5;
+  private twoStarMoves: number = 7;
+  private maxMoves: number = 12;
+  private isOutOfMoves: boolean = false;
   private movesText!: Phaser.GameObjects.Text;
 
   // Level Countdown Timer
@@ -81,8 +84,8 @@ export class GameScene extends Phaser.Scene {
   private keys?: { [key: string]: Phaser.Input.Keyboard.Key };
   private activeTargetCell: { row: number; col: number } | null = null;
   private targetCellHighlight!: Phaser.GameObjects.Graphics;
-  private actionButtonContainer!: Phaser.GameObjects.Container;
-  private actionButtonBg!: Phaser.GameObjects.Arc;
+  private leftActionButtonContainer!: Phaser.GameObjects.Container;
+  private rightActionButtonContainer!: Phaser.GameObjects.Container;
   private hintBtnText!: Phaser.GameObjects.Text;
 
   // Zoom & Pan state
@@ -108,6 +111,7 @@ export class GameScene extends Phaser.Scene {
     this.isEndless = data.isEndless || this.levelId > 100;
     this.isWon = false;
     this.isTimeOver = false;
+    this.isOutOfMoves = false;
     this.isAnimating = false;
     this.pulseOffset = 0;
     this.availableHints = 3;
@@ -138,7 +142,6 @@ export class GameScene extends Phaser.Scene {
     this.tutorialText = level.tutorialText;
     this.totalTimeLimit = level.timeLimit || 60;
     this.timeRemaining = this.totalTimeLimit;
-    this.parMoves = level.parMoves || 5;
 
     this.gridWidth = level.gridWidth;
     this.gridHeight = level.gridHeight;
@@ -161,6 +164,15 @@ export class GameScene extends Phaser.Scene {
           : null
       )
     );
+
+    // Calculate exact minimal moves required using bidirectional rotation (optimal par)
+    const exactMin = this.calculateExactMinMoves(this.grid);
+    this.parMoves = Math.max(exactMin, 2);
+    this.twoStarMoves = this.parMoves + Math.max(2, Math.floor(this.parMoves * 0.4));
+    this.maxMoves = level.maxMoves || Math.max(this.parMoves * 2, this.parMoves + 6);
+
+    // Disable browser right-click context menu so right clicking rotates counter-clockwise
+    this.input.mouse?.disableContextMenu();
 
     // Initialize BFS signal engine
     this.signalEngine = new SignalEngine(this.grid, this.gridHeight, this.gridWidth);
@@ -283,9 +295,9 @@ export class GameScene extends Phaser.Scene {
     this.movesText = this.add.text(
       GAME_WIDTH / 2,
       44,
-      `XOAY: ${this.movesCount}/${this.parMoves} ⭐⭐⭐`,
+      '',
       {
-        fontSize: '13px',
+        fontSize: '12px',
         fontFamily: 'monospace',
         color: '#ffd000',
         fontStyle: 'bold',
@@ -293,6 +305,7 @@ export class GameScene extends Phaser.Scene {
     );
     this.movesText.setOrigin(0.5, 0);
     this.movesText.setDepth(1000);
+    this.updateMovesDisplay();
 
     // Subtitle
     const subtitle = this.add.text(GAME_WIDTH / 2, 66, this.levelSubtitle, {
@@ -914,53 +927,101 @@ export class GameScene extends Phaser.Scene {
     joyLabel.setOrigin(0.5);
     joyLabel.setDepth(150);
 
-    // 2. Action Wrench Button
-    const btnX = GAME_WIDTH - 115;
+    // 2. Action Buttons: ROTATE LEFT (↺) and ROTATE RIGHT (↻)
+    const btnLeftX = 515;
+    const btnRightX = 635;
     const btnY = bottomControlsY;
-    this.actionButtonContainer = this.add.container(btnX, btnY);
-    this.actionButtonContainer.setDepth(150);
 
-    const actionOuter = this.add.circle(0, 0, 48, 0x00f0ff, 0.15);
-    actionOuter.setStrokeStyle(2, 0x00f0ff, 0.6);
+    // LEFT ROTATE BUTTON (↺ TRÁI)
+    this.leftActionButtonContainer = this.add.container(btnLeftX, btnY);
+    this.leftActionButtonContainer.setDepth(150);
 
-    this.actionButtonBg = this.add.circle(0, 0, 42, 0x10253f, 0.9);
-    this.actionButtonBg.setStrokeStyle(3, COLORS.CYBER_YELLOW, 0.95);
+    const leftOuter = this.add.circle(0, 0, 42, 0x00f0ff, 0.12);
+    leftOuter.setStrokeStyle(1.5, 0x00f0ff, 0.5);
 
-    const wrenchSprite = this.add.sprite(0, 0, 'btn_wrench');
-    wrenchSprite.setScale(0.85);
+    const leftBg = this.add.circle(0, 0, 36, 0x10253f, 0.95);
+    leftBg.setStrokeStyle(2.5, 0x00f0ff, 0.9);
 
-    const actionPromptText = this.add.text(0, 68, '⚡ XOAY', {
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      color: '#ffd000',
+    const leftIconText = this.add.text(0, -6, '↺', {
+      fontSize: '32px',
+      fontStyle: 'bold',
+      color: '#00f0ff',
     });
-    actionPromptText.setOrigin(0.5);
+    leftIconText.setOrigin(0.5);
 
-    this.actionButtonContainer.add([actionOuter, this.actionButtonBg, wrenchSprite, actionPromptText]);
+    const leftLabel = this.add.text(0, 46, '↺ TRÁI (Q)', {
+      fontSize: '11px',
+      fontFamily: 'monospace',
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    leftLabel.setOrigin(0.5);
 
-    const actionZone = this.add.zone(btnX, btnY, 96, 96);
-    actionZone.setInteractive({ useHandCursor: true });
-    actionZone.setDepth(151);
+    this.leftActionButtonContainer.add([leftOuter, leftBg, leftIconText, leftLabel]);
 
-    actionZone.on('pointerdown', () => {
+    const leftZone = this.add.zone(btnLeftX, btnY, 80, 80);
+    leftZone.setInteractive({ useHandCursor: true });
+    leftZone.setDepth(151);
+    leftZone.on('pointerdown', () => {
       this.tweens.add({
-        targets: this.actionButtonContainer,
-        scaleX: 0.9,
-        scaleY: 0.9,
+        targets: this.leftActionButtonContainer,
+        scaleX: 0.88,
+        scaleY: 0.88,
         duration: 70,
         yoyo: true,
       });
-      this.rotateCurrentOrTargetGate();
+      this.rotateCurrentOrTargetGate(-1);
+    });
+
+    // RIGHT ROTATE BUTTON (↻ PHẢI)
+    this.rightActionButtonContainer = this.add.container(btnRightX, btnY);
+    this.rightActionButtonContainer.setDepth(150);
+
+    const rightOuter = this.add.circle(0, 0, 46, 0xffd000, 0.15);
+    rightOuter.setStrokeStyle(2, 0xffd000, 0.6);
+
+    const rightBg = this.add.circle(0, 0, 40, 0x10253f, 0.95);
+    rightBg.setStrokeStyle(3, 0xffd000, 0.95);
+
+    const rightIconText = this.add.text(0, -6, '↻', {
+      fontSize: '36px',
+      fontStyle: 'bold',
+      color: '#ffd000',
+    });
+    rightIconText.setOrigin(0.5);
+
+    const rightLabel = this.add.text(0, 46, '↻ PHẢI (E)', {
+      fontSize: '11px',
+      fontFamily: 'monospace',
+      color: '#ffd000',
+      fontStyle: 'bold',
+    });
+    rightLabel.setOrigin(0.5);
+
+    this.rightActionButtonContainer.add([rightOuter, rightBg, rightIconText, rightLabel]);
+
+    const rightZone = this.add.zone(btnRightX, btnY, 86, 86);
+    rightZone.setInteractive({ useHandCursor: true });
+    rightZone.setDepth(151);
+    rightZone.on('pointerdown', () => {
+      this.tweens.add({
+        targets: this.rightActionButtonContainer,
+        scaleX: 0.88,
+        scaleY: 0.88,
+        duration: 70,
+        yoyo: true,
+      });
+      this.rotateCurrentOrTargetGate(1);
     });
 
     // 3. Middle Helper Buttons: Hint & Cheat Sheet
-    const midY = bottomControlsY - 10;
+    const midY = bottomControlsY - 6;
     this.createAuxiliaryButtons(midY);
   }
 
   private createAuxiliaryButtons(y: number): void {
-    const hintX = GAME_WIDTH / 2 - 65;
-    const cheatX = GAME_WIDTH / 2 + 65;
+    const hintX = 265;
+    const cheatX = 365;
 
     // Hint Button
     const hintContainer = this.add.container(hintX, y);
@@ -1360,12 +1421,30 @@ export class GameScene extends Phaser.Scene {
       a: Phaser.Input.Keyboard.KeyCodes.A,
       s: Phaser.Input.Keyboard.KeyCodes.S,
       d: Phaser.Input.Keyboard.KeyCodes.D,
+      q: Phaser.Input.Keyboard.KeyCodes.Q,
+      e: Phaser.Input.Keyboard.KeyCodes.E,
+      z: Phaser.Input.Keyboard.KeyCodes.Z,
       space: Phaser.Input.Keyboard.KeyCodes.SPACE,
       enter: Phaser.Input.Keyboard.KeyCodes.ENTER,
     }) as { [key: string]: Phaser.Input.Keyboard.Key };
 
+    // Rotate Right (Clockwise): SPACE, E, ENTER
     this.input.keyboard.on('keydown-SPACE', () => {
-      this.rotateCurrentOrTargetGate();
+      this.rotateCurrentOrTargetGate(1);
+    });
+    this.input.keyboard.on('keydown-E', () => {
+      this.rotateCurrentOrTargetGate(1);
+    });
+    this.input.keyboard.on('keydown-ENTER', () => {
+      this.rotateCurrentOrTargetGate(1);
+    });
+
+    // Rotate Left (Counter-Clockwise): Q, Z
+    this.input.keyboard.on('keydown-Q', () => {
+      this.rotateCurrentOrTargetGate(-1);
+    });
+    this.input.keyboard.on('keydown-Z', () => {
+      this.rotateCurrentOrTargetGate(-1);
     });
 
     this.input.keyboard.on('keydown-H', () => {
@@ -1377,8 +1456,8 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private rotateCurrentOrTargetGate(): void {
-    if (this.isWon || this.isTimeOver) return;
+  private rotateCurrentOrTargetGate(direction: 1 | -1 = 1): void {
+    if (this.isWon || this.isTimeOver || this.isOutOfMoves) return;
 
     if (!this.activeTargetCell) {
       const closest = this.findClosestRotatableGate();
@@ -1389,7 +1468,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.activeTargetCell) {
       const { row, col } = this.activeTargetCell;
-      this.handleCellTap(row, col);
+      this.handleCellTap(row, col, direction);
     }
   }
 
@@ -1439,13 +1518,201 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private calculateExactMinMoves(grid: (GateDefinition | null)[][]): number {
+    let minMoves = 0;
+    for (let r = 0; r < this.gridHeight; r++) {
+      for (let c = 0; c < this.gridWidth; c++) {
+        const cell = grid[r]?.[c];
+        if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
+          if (cell.type === GateType.WIRE) {
+            if (cell.rotation % 2 !== cell.correctRotation % 2) {
+              minMoves += 1;
+            }
+          } else {
+            const diffCw = (cell.correctRotation - cell.rotation + 4) % 4;
+            const diffCcw = (cell.rotation - cell.correctRotation + 4) % 4;
+            minMoves += Math.min(diffCw, diffCcw);
+          }
+        }
+      }
+    }
+    return Math.max(minMoves, 2);
+  }
+
+  private updateMovesDisplay(): void {
+    if (!this.movesText) return;
+    const remaining = Math.max(0, this.maxMoves - this.movesCount);
+    let starColor = '#ffd000';
+    let starIcon = '⭐⭐⭐';
+
+    if (this.movesCount <= this.parMoves) {
+      starColor = '#ffd000';
+      starIcon = '⭐⭐⭐';
+    } else if (this.movesCount <= this.twoStarMoves) {
+      starColor = '#00f0ff';
+      starIcon = '⭐⭐☆';
+    } else if (this.movesCount <= this.maxMoves) {
+      starColor = '#ffaa44';
+      starIcon = '⭐☆☆';
+    }
+
+    const turnsWarning = remaining <= 3 ? ' ⚠️' : '';
+    this.movesText.setText(`LƯỢT: ${this.movesCount}/${this.maxMoves} (${remaining} CÒN)${turnsWarning} | CHUẨN: ${this.parMoves} ${starIcon}`);
+    this.movesText.setColor(remaining <= 3 ? '#ff3344' : starColor);
+  }
+
+  private spawnRotationIndicator(x: number, y: number, direction: 1 | -1): void {
+    const iconText = direction === 1 ? '↻ PHẢI' : '↺ TRÁI';
+    const iconColor = direction === 1 ? '#ffd000' : '#00f0ff';
+    const tag = this.add.text(x, y - 25, iconText, {
+      fontSize: '13px',
+      fontFamily: 'monospace',
+      fontStyle: 'bold',
+      color: iconColor,
+      backgroundColor: '#0a192f',
+      padding: { x: 5, y: 2 },
+    });
+    tag.setOrigin(0.5);
+    tag.setDepth(200);
+
+    this.tweens.add({
+      targets: tag,
+      y: y - 55,
+      alpha: 0,
+      duration: 400,
+      ease: 'Quad.easeOut',
+      onComplete: () => tag.destroy(),
+    });
+  }
+
+  private triggerOutOfMoves(): void {
+    if (this.isOutOfMoves || this.isWon) return;
+    this.isOutOfMoves = true;
+    this.showToast('🚫 HẾT LƯỢT XOAY! HÃY THỬ LẠI.');
+    this.showOutOfMovesModal();
+  }
+
+  private showOutOfMovesModal(): void {
+    if (this.modalGroup) return;
+
+    const modal = this.add.container(0, 0);
+    modal.setDepth(2000);
+
+    const backdrop = this.add.rectangle(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      GAME_WIDTH,
+      GAME_HEIGHT,
+      0x000000,
+      0.82
+    );
+    backdrop.setInteractive();
+
+    const py = GAME_HEIGHT / 2 - 20;
+    const panelW = 480;
+    const panelH = 380;
+
+    const panel = this.add.graphics();
+    panel.fillStyle(0x0e1b2e, 0.98);
+    panel.lineStyle(2, 0xff2a55, 1);
+    panel.fillRoundedRect(GAME_WIDTH / 2 - panelW / 2, py - panelH / 2, panelW, panelH, 16);
+    panel.strokeRoundedRect(GAME_WIDTH / 2 - panelW / 2, py - panelH / 2, panelW, panelH, 16);
+
+    const icon = this.add.text(GAME_WIDTH / 2, py - 120, '🚫', {
+      fontSize: '52px',
+    });
+    icon.setOrigin(0.5);
+
+    const title = this.add.text(GAME_WIDTH / 2, py - 55, 'HẾT LƯỢT XOAY!', {
+      fontSize: '24px',
+      fontFamily: 'monospace',
+      color: '#ff2a55',
+      fontStyle: 'bold',
+    });
+    title.setOrigin(0.5);
+
+    const info = this.add.text(
+      GAME_WIDTH / 2,
+      py + 10,
+      `Bạn đã sử dụng hết ${this.maxMoves}/${this.maxMoves} lượt xoay!\nTiêu chuẩn 3 Sao của màn này là ${this.parMoves} lượt.\nHãy tính toán đường dẫn kỹ thuật số trước khi xoay.`,
+      {
+        fontSize: '13px',
+        fontFamily: 'monospace',
+        color: '#c0c8e0',
+        align: 'center',
+        lineSpacing: 6,
+      }
+    );
+    info.setOrigin(0.5);
+
+    const btnW = 340;
+    const btnH = 46;
+
+    const retryBtn = this.add.container(GAME_WIDTH / 2, py + 85);
+    const retryBg = this.add.graphics();
+    retryBg.fillStyle(0xff2a55, 1);
+    retryBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
+    const retryText = this.add.text(0, 0, '🔄 THỬ LẠI NGAY', {
+      fontSize: '15px',
+      fontFamily: 'monospace',
+      color: '#ffffff',
+      fontStyle: 'bold',
+    });
+    retryText.setOrigin(0.5);
+    retryBtn.add([retryBg, retryText]);
+
+    const retryZone = this.add.zone(0, 0, btnW, btnH);
+    retryZone.setInteractive({ useHandCursor: true });
+    retryZone.on('pointerdown', () => {
+      this.restartCurrentLevel();
+    });
+    retryBtn.add(retryZone);
+
+    const selectBtn = this.add.container(GAME_WIDTH / 2, py + 145);
+    const selectBg = this.add.graphics();
+    selectBg.fillStyle(0x162a45, 1);
+    selectBg.lineStyle(1.5, 0x00f0ff, 0.7);
+    selectBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
+    selectBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
+    const selectText = this.add.text(0, 0, '📋 DANH SÁCH MÀN CHƠI', {
+      fontSize: '14px',
+      fontFamily: 'monospace',
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    selectText.setOrigin(0.5);
+    selectBtn.add([selectBg, selectText]);
+
+    const selectZone = this.add.zone(0, 0, btnW, btnH);
+    selectZone.setInteractive({ useHandCursor: true });
+    selectZone.on('pointerdown', () => {
+      this.cleanupAndNavigate('LevelSelectScene');
+    });
+    selectBtn.add(selectZone);
+
+    modal.add([backdrop, panel, icon, title, info, retryBtn, selectBtn]);
+    this.modalGroup = modal;
+  }
+
   private setupTouchControls(): void {
     this.touchControls = new TouchControls(this);
 
-    this.touchControls.setTapHandler((x: number, y: number) => {
+    this.touchControls.setTapHandler((x: number, y: number, pointer: Phaser.Input.Pointer) => {
       const { row, col } = this.screenToGrid(x, y);
       if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
-        this.handleCellTap(row, col);
+        // 1. Right click on mouse/PC -> rotate counter-clockwise (Left: -1)
+        if (pointer.rightButtonDown() || pointer.button === 2) {
+          this.handleCellTap(row, col, -1);
+          return;
+        }
+
+        // 2. Left click / Touch: Tap left side of cell -> rotate Left (-1), right side -> rotate Right (+1)
+        const cellLeftScreenX = this.boardOffsetX + this.boardContainer.x + col * this.cellSize * this.boardScale;
+        const cellCenterScreenX = cellLeftScreenX + (this.cellSize * this.boardScale) / 2;
+        const diffX = x - cellCenterScreenX;
+
+        const direction = diffX < -this.cellSize * this.boardScale * 0.08 ? -1 : 1;
+        this.handleCellTap(row, col, direction);
       }
     });
 
@@ -1463,15 +1730,13 @@ export class GameScene extends Phaser.Scene {
     return { row, col };
   }
 
-  private handleCellTap(row: number, col: number): void {
+  private handleCellTap(row: number, col: number, direction: 1 | -1 = 1): void {
     const cell = this.grid[row][col];
-    if (!cell || cell.fixed || cell.locked || this.isAnimating || this.isWon || this.isTimeOver) return;
+    if (!cell || cell.fixed || cell.locked || this.isAnimating || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
 
     // Track Moves and update HUD
     this.movesCount++;
-    const currentStars = this.movesCount <= this.parMoves ? 3 : this.movesCount <= Math.floor(this.parMoves * 1.5) ? 2 : 1;
-    const starIcon = currentStars === 3 ? '⭐⭐⭐' : currentStars === 2 ? '⭐⭐☆' : '⭐☆☆';
-    this.movesText.setText(`XOAY: ${this.movesCount}/${this.parMoves} ${starIcon}`);
+    this.updateMovesDisplay();
 
     const targetX = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
     const targetY = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
@@ -1488,9 +1753,27 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.isAnimating = true;
-    cell.rotation = (cell.rotation + 1) % 4;
 
+    // Apply rotation
+    if (cell.type === GateType.WIRE) {
+      cell.rotation = (cell.rotation + 1) % 2;
+    } else {
+      if (direction === 1) {
+        cell.rotation = (cell.rotation + 1) % 4;
+      } else {
+        cell.rotation = (cell.rotation + 3) % 4;
+      }
+    }
+
+    // Spawn floating rotation indicator badge
+    this.spawnRotationIndicator(targetX, targetY, direction);
     this.createSparkEffect(targetX, targetY);
+
+    const onCompleteRotation = () => {
+      this.drawGateInCell(row, col);
+      this.propagateSignals();
+      this.isAnimating = false;
+    };
 
     const sprite = this.cellSprites[row]?.[col];
     if (sprite) {
@@ -1501,15 +1784,10 @@ export class GameScene extends Phaser.Scene {
         duration: ANIM.ROTATE_DURATION / 2,
         yoyo: true,
         ease: 'Sine.easeOut',
-        onComplete: () => {
-          this.drawGateInCell(row, col);
-          this.propagateSignals();
-          this.isAnimating = false;
-        },
+        onComplete: onCompleteRotation,
       });
     } else {
-      this.propagateSignals();
-      this.isAnimating = false;
+      onCompleteRotation();
     }
   }
 
@@ -1588,6 +1866,8 @@ export class GameScene extends Phaser.Scene {
       this.isWon = true;
       this.updateLedStatus();
       this.celebrateWinAndShowModal();
+    } else if (!isWin && !this.isWon && this.movesCount >= this.maxMoves && !this.isOutOfMoves) {
+      this.triggerOutOfMoves();
     }
   }
 
@@ -1665,10 +1945,10 @@ export class GameScene extends Phaser.Scene {
 
   private celebrateWinAndShowModal(): void {
     try {
-      let starsCount = 3;
-      if (this.movesCount > Math.floor(this.parMoves * 1.5)) {
-        starsCount = 1;
-      } else if (this.movesCount > this.parMoves) {
+      let starsCount = 1;
+      if (this.movesCount <= this.parMoves) {
+        starsCount = 3;
+      } else if (this.movesCount <= this.twoStarMoves) {
         starsCount = 2;
       }
 
@@ -1844,7 +2124,7 @@ export class GameScene extends Phaser.Scene {
     const statsText = this.add.text(
       GAME_WIDTH / 2,
       py + 195,
-      `LƯỢT XOAY: ${this.movesCount} / CHUẨN: ${this.parMoves} BƯỚC\n${starsCount === 3 ? '🏆 ĐẠT TIÊU CHUẨN HOÀN HẢO (3 SAO)!' : starsCount === 2 ? '⚡ XUẤT SẮC (2 SAO)!' : '👍 HOÀN THÀNH (1 SAO)!'}`,
+      `LƯỢT XOAY: ${this.movesCount}/${this.maxMoves} (Chuẩn 3★: ${this.parMoves} lượt)\n${starsCount === 3 ? '🏆 ĐẠT TIÊU CHUẨN HOÀN HẢO (3 SAO)!' : starsCount === 2 ? '⚡ XUẤT SẮC (2 SAO)!' : '👍 HOÀN THÀNH (1 SAO)!'}`,
       {
         fontSize: '13px',
         fontFamily: 'monospace',

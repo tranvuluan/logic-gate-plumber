@@ -129,6 +129,7 @@ export interface LevelDefinition {
   tutorialText: string;
   timeLimit: number;         // Time limit in seconds
   parMoves: number;          // Optimal moves for 3-star rating
+  maxMoves?: number;         // Move limit: maximum allowed rotations before game over
   cells: (GateDefinition | null)[][];
   sources: { row: number; col: number; value: number }[];
   leds: { row: number; col: number; targetSignal?: number }[]; // targetSignal: 1 (default) or 0
