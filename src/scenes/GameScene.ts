@@ -165,11 +165,10 @@ export class GameScene extends Phaser.Scene {
       )
     );
 
-    // Calculate exact minimal moves required using bidirectional rotation (optimal par)
-    const exactMin = this.calculateExactMinMoves(this.grid);
-    this.parMoves = Math.max(exactMin, 2);
-    this.twoStarMoves = this.parMoves + Math.max(2, Math.floor(this.parMoves * 0.4));
-    this.maxMoves = level.maxMoves || Math.max(this.parMoves * 2, this.parMoves + 6);
+    // Accurate Par moves & tight tactical move limit
+    this.parMoves = level.parMoves || this.calculateExactMinMoves(this.grid);
+    this.twoStarMoves = this.parMoves + 1; // 2 Stars: strictly within 1 move of optimal par!
+    this.maxMoves = level.maxMoves || (this.parMoves + (this.parMoves <= 3 ? 2 : this.parMoves <= 7 ? 3 : 4));
 
     // Disable browser right-click context menu so right clicking rotates counter-clockwise
     this.input.mouse?.disableContextMenu();
@@ -486,8 +485,28 @@ export class GameScene extends Phaser.Scene {
         container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
         const cellR = r;
         const cellC = c;
-        container.on('pointerdown', () => {
-          this.handleCellTap(cellR, cellC);
+        container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+          if (this.isWon || this.isTimeOver || this.isOutOfMoves || this.isAnimating) return;
+
+          const cellDef = this.grid[cellR]?.[cellC];
+          if (!cellDef || cellDef.fixed || cellDef.locked || cellDef.type === GateType.SOURCE || cellDef.type === GateType.LED) {
+            return;
+          }
+
+          // 1. Select and highlight this active target cell
+          this.selectCell(cellR, cellC);
+
+          // 2. Right click on PC / mouse -> Rotate Left (-1)
+          if (pointer.rightButtonDown() || pointer.button === 2) {
+            this.handleCellTap(cellR, cellC, -1);
+            return;
+          }
+
+          // 3. Screen horizontal coordinate test (Immune to container / gate rotation!):
+          // Center of this cell in screen coordinates
+          const cellCenterScreenX = this.boardOffsetX + this.boardContainer.x + (cellC * this.cellSize + this.cellSize / 2) * this.boardScale;
+          const direction: 1 | -1 = pointer.x < cellCenterScreenX ? -1 : 1;
+          this.handleCellTap(cellR, cellC, direction);
         });
 
         this.cellSprites[r][c] = {
@@ -1456,13 +1475,35 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  private selectCell(row: number, col: number): void {
+    const cell = this.grid[row]?.[col];
+    if (!cell || cell.fixed || cell.locked || cell.type === GateType.SOURCE || cell.type === GateType.LED) {
+      return;
+    }
+    this.activeTargetCell = { row, col };
+    this.updateTargetHighlight();
+
+    const targetX = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
+    const targetY = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
+    if (this.player) {
+      this.player.setFlipX(targetX < this.player.x);
+      this.tweens.add({
+        targets: this.player,
+        x: targetX,
+        y: targetY,
+        duration: 120,
+        ease: 'Quad.easeOut',
+      });
+    }
+  }
+
   private rotateCurrentOrTargetGate(direction: 1 | -1 = 1): void {
     if (this.isWon || this.isTimeOver || this.isOutOfMoves) return;
 
     if (!this.activeTargetCell) {
       const closest = this.findClosestRotatableGate();
       if (closest) {
-        this.activeTargetCell = closest;
+        this.selectCell(closest.row, closest.col);
       }
     }
 
@@ -1588,7 +1629,8 @@ export class GameScene extends Phaser.Scene {
   private triggerOutOfMoves(): void {
     if (this.isOutOfMoves || this.isWon) return;
     this.isOutOfMoves = true;
-    this.showToast('🚫 HẾT LƯỢT XOAY! HÃY THỬ LẠI.');
+    this.cameras.main.shake(250, 0.012);
+    this.showToast('🚫 HẾT LƯỢT XOAY! MẠCH CHƯA ĐẠT YÊU CẦU.');
     this.showOutOfMovesModal();
   }
 
@@ -1604,9 +1646,12 @@ export class GameScene extends Phaser.Scene {
       GAME_WIDTH,
       GAME_HEIGHT,
       0x000000,
-      0.82
+      0.85
     );
-    backdrop.setInteractive();
+    backdrop.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
+    backdrop.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      pointer.event?.stopPropagation?.();
+    });
 
     const py = GAME_HEIGHT / 2 - 20;
     const panelW = 480;
@@ -1697,25 +1742,7 @@ export class GameScene extends Phaser.Scene {
   private setupTouchControls(): void {
     this.touchControls = new TouchControls(this);
 
-    this.touchControls.setTapHandler((x: number, y: number, pointer: Phaser.Input.Pointer) => {
-      const { row, col } = this.screenToGrid(x, y);
-      if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
-        // 1. Right click on mouse/PC -> rotate counter-clockwise (Left: -1)
-        if (pointer.rightButtonDown() || pointer.button === 2) {
-          this.handleCellTap(row, col, -1);
-          return;
-        }
-
-        // 2. Left click / Touch: Tap left side of cell -> rotate Left (-1), right side -> rotate Right (+1)
-        const cellLeftScreenX = this.boardOffsetX + this.boardContainer.x + col * this.cellSize * this.boardScale;
-        const cellCenterScreenX = cellLeftScreenX + (this.cellSize * this.boardScale) / 2;
-        const diffX = x - cellCenterScreenX;
-
-        const direction = diffX < -this.cellSize * this.boardScale * 0.08 ? -1 : 1;
-        this.handleCellTap(row, col, direction);
-      }
-    });
-
+    // Long press on any cell to open logic gate cheat sheet
     this.touchControls.setLongPressHandler((x: number, y: number) => {
       const { row, col } = this.screenToGrid(x, y);
       if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
@@ -1773,6 +1800,11 @@ export class GameScene extends Phaser.Scene {
       this.drawGateInCell(row, col);
       this.propagateSignals();
       this.isAnimating = false;
+
+      // Check Out of Moves: If not won and moves >= maxMoves, trigger Game Over!
+      if (!this.isWon && this.movesCount >= this.maxMoves && !this.isOutOfMoves) {
+        this.triggerOutOfMoves();
+      }
     };
 
     const sprite = this.cellSprites[row]?.[col];
@@ -1842,6 +1874,17 @@ export class GameScene extends Phaser.Scene {
           sprite.gateGraphics.moveTo(-halfSize, 0);
           sprite.gateGraphics.lineTo(-s, 0);
           sprite.gateGraphics.strokePath();
+        } else if (gate.type !== GateType.SOURCE && sprite.signalIndicator) {
+          sprite.signalIndicator.clear();
+          if (state && state.connected) {
+            const halfSize = this.cellSize / 2 - 4;
+            const isOne = state.outputSignal === 1;
+            // Draw output pin signal dot
+            sprite.signalIndicator.fillStyle(isOne ? 0x00ff88 : 0x0088cc, 0.95);
+            sprite.signalIndicator.lineStyle(1.5, 0xffffff, 0.9);
+            sprite.signalIndicator.fillCircle(halfSize - 6, 0, 4);
+            sprite.signalIndicator.strokeCircle(halfSize - 6, 0, 4);
+          }
         }
       }
     }
@@ -2338,14 +2381,52 @@ export class GameScene extends Phaser.Scene {
     if (!this.targetCellHighlight) return;
 
     this.targetCellHighlight.clear();
-    if (!this.activeTargetCell || this.isWon || this.isTimeOver) return;
+    if (!this.activeTargetCell || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
 
     const { row, col } = this.activeTargetCell;
     const x = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
     const y = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
     const half = this.cellSize / 2;
 
-    this.targetCellHighlight.lineStyle(2, COLORS.CYBER_YELLOW, 0.85);
-    this.targetCellHighlight.strokeRoundedRect(x - half + 2, y - half + 2, this.cellSize - 4, this.cellSize - 4, 8);
+    // Glowing Cyberpunk Outer Box
+    this.targetCellHighlight.lineStyle(2.5, 0x00f0ff, 0.95);
+    this.targetCellHighlight.strokeRoundedRect(x - half + 1, y - half + 1, this.cellSize - 2, this.cellSize - 2, 8);
+
+    // Left half indicator tint: Subtle cyan glow for Left Rotation ↺
+    this.targetCellHighlight.fillStyle(0x00f0ff, 0.09);
+    this.targetCellHighlight.fillRect(x - half + 3, y - half + 3, half - 3, this.cellSize - 6);
+
+    // Right half indicator tint: Subtle yellow glow for Right Rotation ↻
+    this.targetCellHighlight.fillStyle(0xffd000, 0.09);
+    this.targetCellHighlight.fillRect(x, y - half + 3, half - 3, this.cellSize - 6);
+
+    // Center divider line
+    this.targetCellHighlight.lineStyle(1.5, 0x3a5a7a, 0.7);
+    this.targetCellHighlight.beginPath();
+    this.targetCellHighlight.moveTo(x, y - half + 4);
+    this.targetCellHighlight.lineTo(x, y + half - 4);
+    this.targetCellHighlight.strokePath();
+
+    // Corner accents
+    const arm = Math.min(16, this.cellSize * 0.25);
+    this.targetCellHighlight.lineStyle(3, 0xffd000, 1);
+    // Top-Left
+    this.targetCellHighlight.beginPath();
+    this.targetCellHighlight.moveTo(x - half, y - half + arm);
+    this.targetCellHighlight.lineTo(x - half, y - half);
+    this.targetCellHighlight.lineTo(x - half + arm, y - half);
+    // Top-Right
+    this.targetCellHighlight.moveTo(x + half - arm, y - half);
+    this.targetCellHighlight.lineTo(x + half, y - half);
+    this.targetCellHighlight.lineTo(x + half, y - half + arm);
+    // Bottom-Left
+    this.targetCellHighlight.moveTo(x - half, y + half - arm);
+    this.targetCellHighlight.lineTo(x - half, y + half);
+    this.targetCellHighlight.lineTo(x - half + arm, y + half);
+    // Bottom-Right
+    this.targetCellHighlight.moveTo(x + half - arm, y + half);
+    this.targetCellHighlight.lineTo(x + half, y + half);
+    this.targetCellHighlight.lineTo(x + half, y + half - arm);
+    this.targetCellHighlight.strokePath();
   }
 }

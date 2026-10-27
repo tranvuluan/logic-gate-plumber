@@ -5,8 +5,37 @@ import { getDefaultPorts } from './GateTypes';
  * 100 Progressive Levels spanning 5 Chapters + Endless Generator.
  * Guaranteed 100% mathematically solvable and verified by SignalEngine.
  */
+export function computeExactParMoves(cells: (GateDefinition | null)[][], rows: number, cols: number): number {
+  let minMoves = 0;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = cells[r]?.[c];
+      if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
+        if (cell.type === GateType.WIRE || cell.type === GateType.CROSSOVER) {
+          if (cell.rotation % 2 !== cell.correctRotation % 2) {
+            minMoves += 1;
+          }
+        } else {
+          const diffCw = (cell.correctRotation - cell.rotation + 4) % 4;
+          const diffCcw = (cell.rotation - cell.correctRotation + 4) % 4;
+          minMoves += Math.min(diffCw, diffCcw);
+        }
+      }
+    }
+  }
+  return Math.max(minMoves, 1);
+}
+
 export function getLevels(): LevelDefinition[] {
-  return ALL_LEVELS;
+  return ALL_LEVELS.map((lvl) => {
+    const truePar = computeExactParMoves(lvl.cells, lvl.gridHeight, lvl.gridWidth);
+    const allowance = truePar <= 3 ? 2 : truePar <= 7 ? 3 : 4;
+    return {
+      ...lvl,
+      parMoves: truePar,
+      maxMoves: lvl.maxMoves || (truePar + allowance),
+    };
+  });
 }
 
 /**
@@ -61,6 +90,10 @@ export function generateEndlessLevel(levelNum: number): LevelDefinition {
     }
   }
 
+  const cells = createGrid(H, W, placements);
+  const truePar = computeExactParMoves(cells, H, W);
+  const allowance = truePar <= 3 ? 2 : truePar <= 7 ? 3 : 4;
+
   return {
     id: levelNum,
     chapter: 6,
@@ -69,11 +102,12 @@ export function generateEndlessLevel(levelNum: number): LevelDefinition {
     gridWidth: W,
     gridHeight: H,
     timeLimit: 180,
-    parMoves: placements.filter(p => !p.fixed).length * 2,
+    parMoves: truePar,
+    maxMoves: truePar + allowance,
     tutorialText: '🌌 CHẾ ĐỘ VÔ TẬN: Các siêu mạch được kiến tạo ngẫu nhiên theo thời gian thực. Hãy chinh phục chuỗi thắng cao nhất!',
     sources,
     leds,
-    cells: createGrid(H, W, placements),
+    cells,
   };
 }
 
