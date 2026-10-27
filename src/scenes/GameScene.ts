@@ -17,6 +17,7 @@ import { TouchControls } from '../utils/TouchControls';
 import { VirtualJoystick } from '../utils/VirtualJoystick';
 import { getLevels, generateEndlessLevel } from '../logic/LevelGenerator';
 import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
+import { i18n } from '../utils/i18n';
 
 interface CellSprite {
   container: Phaser.GameObjects.Container;
@@ -137,9 +138,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.levelId = level.id;
-    this.levelName = level.name;
-    this.levelSubtitle = level.subtitle;
-    this.tutorialText = level.tutorialText;
+    this.levelName = i18n.translateLevelName(level.id, level.name);
+    this.levelSubtitle = i18n.translateLevelSubtitle(level.id, level.subtitle);
+    this.tutorialText = i18n.translateTutorialText(level.id, level.tutorialText);
     this.totalTimeLimit = level.timeLimit || 60;
     this.timeRemaining = this.totalTimeLimit;
 
@@ -267,7 +268,7 @@ export class GameScene extends Phaser.Scene {
     const backBg = this.add.rectangle(0, 0, 116, 36, 0x112740, 0.92);
     backBg.setStrokeStyle(1.5, 0x00f0ff, 0.8);
     backBg.setInteractive({ useHandCursor: true });
-    const backBtnText = this.add.text(0, 0, '← CHỌN MÀN', {
+    const backBtnText = this.add.text(0, 0, i18n.t('btn_back_levels'), {
       fontSize: '13px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -321,12 +322,17 @@ export class GameScene extends Phaser.Scene {
     const nextHdrBg = this.add.rectangle(0, 0, 220, 28, 0x00ff88, 1);
     nextHdrBg.setStrokeStyle(1.5, 0xffffff, 1);
     nextHdrBg.setInteractive({ useHandCursor: true });
-    const nextHdrText = this.add.text(0, 0, `⏩ QUA MÀN ${this.levelId + 1} ➔`, {
-      fontSize: '13px',
-      fontFamily: 'monospace',
-      color: '#061a12',
-      fontStyle: 'bold',
-    });
+    const nextHdrText = this.add.text(
+      0,
+      0,
+      this.isEndless ? i18n.t('btn_next_endless') : i18n.t('btn_next_level', { next: this.levelId + 1 }),
+      {
+        fontSize: '13px',
+        fontFamily: 'monospace',
+        color: '#061a12',
+        fontStyle: 'bold',
+      }
+    );
     nextHdrText.setOrigin(0.5);
     this.headerNextBtn.add([nextHdrBg, nextHdrText]);
     this.headerNextBtn.setVisible(false);
@@ -351,7 +357,7 @@ export class GameScene extends Phaser.Scene {
     const restartBg = this.add.rectangle(0, 0, 96, 30, 0x301525, 0.92);
     restartBg.setStrokeStyle(1.5, 0xff6688, 0.85);
     restartBg.setInteractive({ useHandCursor: true });
-    const restartText = this.add.text(0, 0, '↻ LÀM LẠI', {
+    const restartText = this.add.text(0, 0, `↻ ${i18n.getLanguage() === 'vi' ? 'LÀM LẠI' : 'RETRY'}`, {
       fontSize: '12px',
       fontFamily: 'monospace',
       color: '#ff88aa',
@@ -938,7 +944,7 @@ export class GameScene extends Phaser.Scene {
     // 1. Virtual Joystick
     this.virtualJoystick = new VirtualJoystick(this, 115, bottomControlsY, 52);
 
-    const joyLabel = this.add.text(115, bottomControlsY + 70, '🎮 DI CHUYỂN', {
+    const joyLabel = this.add.text(115, bottomControlsY + 70, `🎮 ${i18n.getLanguage() === 'vi' ? 'DI CHUYỂN' : 'MOVE'}`, {
       fontSize: '12px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -968,7 +974,7 @@ export class GameScene extends Phaser.Scene {
     });
     leftIconText.setOrigin(0.5);
 
-    const leftLabel = this.add.text(0, 46, '↺ TRÁI (Q)', {
+    const leftLabel = this.add.text(0, 46, i18n.t('btn_rotate_left'), {
       fontSize: '11px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -1009,7 +1015,7 @@ export class GameScene extends Phaser.Scene {
     });
     rightIconText.setOrigin(0.5);
 
-    const rightLabel = this.add.text(0, 46, '↻ PHẢI (E)', {
+    const rightLabel = this.add.text(0, 46, i18n.t('btn_rotate_right'), {
       fontSize: '11px',
       fontFamily: 'monospace',
       color: '#ffd000',
@@ -1055,7 +1061,7 @@ export class GameScene extends Phaser.Scene {
     const hintIcon = this.add.text(0, -10, '💡', { fontSize: '24px' });
     hintIcon.setOrigin(0.5);
 
-    this.hintBtnText = this.add.text(0, 18, `GỢI Ý (${this.availableHints})`, {
+    this.hintBtnText = this.add.text(0, 18, `${i18n.t('btn_hint')} (${this.availableHints})`, {
       fontSize: '11px',
       fontFamily: 'monospace',
       color: '#ffd000',
@@ -1085,7 +1091,7 @@ export class GameScene extends Phaser.Scene {
     const cheatIcon = this.add.text(0, -10, '📖', { fontSize: '24px' });
     cheatIcon.setOrigin(0.5);
 
-    const cheatText = this.add.text(0, 18, 'TRA CỨU', {
+    const cheatText = this.add.text(0, 18, i18n.t('btn_cheat_sheet'), {
       fontSize: '11px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -1097,6 +1103,10 @@ export class GameScene extends Phaser.Scene {
 
     const cheatZone = this.add.zone(cheatX, y, 90, 70);
     cheatZone.setInteractive({ useHandCursor: true });
+    cheatZone.setDepth(151);
+    cheatZone.on('pointerdown', () => {
+      this.toggleCheatSheet();
+    });
     cheatZone.setDepth(151);
     cheatZone.on('pointerdown', () => {
       this.toggleCheatSheet();
@@ -1170,7 +1180,7 @@ export class GameScene extends Phaser.Scene {
     btnBg.fillRoundedRect(-46, -16, 92, 32, 6);
     btnBg.strokeRoundedRect(-46, -16, 92, 32, 6);
 
-    const btnText = this.add.text(0, 0, '⛶ VỪA MÀN', {
+    const btnText = this.add.text(0, 0, i18n.t('btn_fit_screen'), {
       fontSize: '11px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -1208,7 +1218,7 @@ export class GameScene extends Phaser.Scene {
     statusPanel.strokeRoundedRect(20, bottomBarY, GAME_WIDTH - 40, 42, 8);
     statusPanel.setDepth(120);
 
-    this.ledStatusText = this.add.text(45, bottomBarY + 21, '💡 ĐẦU RA: 0/0', {
+    this.ledStatusText = this.add.text(45, bottomBarY + 21, `${i18n.t('led_outputs')}: 0/0`, {
       fontSize: '13px',
       fontFamily: 'monospace',
       color: '#00ff88',
@@ -1218,7 +1228,7 @@ export class GameScene extends Phaser.Scene {
     this.ledStatusText.setDepth(121);
 
     if (this.testCases && this.testCases.length > 0) {
-      this.clockStatusText = this.add.text(GAME_WIDTH - 45, bottomBarY + 21, `⏱️ CHU KỲ: [1/${this.testCases.length}]`, {
+      this.clockStatusText = this.add.text(GAME_WIDTH - 45, bottomBarY + 21, `${i18n.t('clock_cycle')}: [1/${this.testCases.length}]`, {
         fontSize: '12px',
         fontFamily: 'monospace',
         color: '#ffd000',
@@ -1248,7 +1258,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const isAll = satisfied === this.leds.length;
-    this.ledStatusText.setText(`💡 ĐẦU RA: ${satisfied}/${this.leds.length} ${isAll ? '✅ HOÀN TẤT' : '⏳'}`);
+    this.ledStatusText.setText(`${i18n.t('led_outputs')}: ${satisfied}/${this.leds.length} ${isAll ? i18n.t('led_complete') : '⏳'}`);
     this.ledStatusText.setColor(isAll ? '#00ff88' : '#ffd000');
   }
 
@@ -1274,7 +1284,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (wrongGates.length === 0) {
-      this.showToast('✅ Mọi cổng đã đúng chiều!');
+      this.showToast(i18n.t('toast_all_correct'));
       return;
     }
 
@@ -1284,7 +1294,7 @@ export class GameScene extends Phaser.Scene {
 
     this.availableHints--;
     if (this.hintBtnText) {
-      this.hintBtnText.setText(`GỢI Ý (${Math.max(0, this.availableHints)})`);
+      this.hintBtnText.setText(`${i18n.t('btn_hint')} (${Math.max(0, this.availableHints)})`);
     }
 
     const sprite = this.cellSprites[target.r]?.[target.c];
@@ -1319,7 +1329,7 @@ export class GameScene extends Phaser.Scene {
       this.propagateSignals();
     }
 
-    this.showToast('✨ Đã sửa đúng & khóa 1 cổng!');
+    this.showToast(i18n.t('toast_hint_used'));
   }
 
   private toggleCheatSheet(): void {
@@ -1349,7 +1359,7 @@ export class GameScene extends Phaser.Scene {
     panel.fillRoundedRect(px, py, pw, ph, 14);
     panel.strokeRoundedRect(px, py, pw, ph, 14);
 
-    const title = this.add.text(GAME_WIDTH / 2, py + 26, '📖 BẢNG TRA CỨU CỔNG LOGIC', {
+    const title = this.add.text(GAME_WIDTH / 2, py + 26, i18n.t('cheat_sheet_title'), {
       fontSize: '20px',
       fontFamily: 'monospace',
       color: '#00ff88',
@@ -1358,16 +1368,16 @@ export class GameScene extends Phaser.Scene {
     title.setOrigin(0.5);
 
     const cheatItems = [
-      { name: 'CỔNG NOT (▷○)', rule: 'Đảo bit: 0 ➜ 1  |  1 ➜ 0', color: '#00f0ff' },
-      { name: 'CỔNG AND (&)', rule: 'VÀ: Cả hai đầu vào đều là 1 mới ra 1', color: '#ffd000' },
-      { name: 'CỔNG NAND (⊼)', rule: 'Đảo AND: Ra 0 khi cả hai là 1, còn lại ra 1', color: '#ffb703' },
-      { name: 'CỔNG OR (≥1)', rule: 'HOẶC: Ít nhất 1 đầu vào là 1 thì ra 1', color: '#00ff88' },
-      { name: 'CỔNG NOR (⊽)', rule: 'Đảo OR: Chỉ ra 1 khi cả hai đầu vào là 0', color: '#06d6a0' },
-      { name: 'CỔNG XOR (=1)', rule: 'KHÁC NHAU: Hai đầu khác nhau (1 & 0) ra 1', color: '#ff007f' },
-      { name: 'CỔNG XNOR (≡)', rule: 'GIỐNG NHAU: Hai đầu giống nhau (1&1, 0&0) ra 1', color: '#b5179e' },
-      { name: 'DIODE (▷|)', rule: '1 CHIỀU: Dòng điện chỉ đi xuôi theo mũi tên', color: '#4cc9f0' },
-      { name: 'CẦU VƯỢT (┼)', rule: 'VƯỢT CÁP: Tín hiệu ngang và dọc đi xuyên không chập', color: '#7209b7' },
-      { name: 'CHIA NGÃ 4 (✚)', rule: 'PHÂN TOẢ: Tín hiệu vào 1 chân sẽ tỏa ra cả 3 chân', color: '#f72585' },
+      { name: i18n.t('cheat_not_name'), rule: i18n.t('cheat_not_desc'), color: '#00f0ff' },
+      { name: i18n.t('cheat_and_name'), rule: i18n.t('cheat_and_desc'), color: '#ffd000' },
+      { name: i18n.t('cheat_nand_name'), rule: i18n.t('cheat_nand_desc'), color: '#ffb703' },
+      { name: i18n.t('cheat_or_name'), rule: i18n.t('cheat_or_desc'), color: '#00ff88' },
+      { name: i18n.t('cheat_nor_name'), rule: i18n.t('cheat_nor_desc'), color: '#06d6a0' },
+      { name: i18n.t('cheat_xor_name'), rule: i18n.t('cheat_xor_desc'), color: '#ff007f' },
+      { name: i18n.t('cheat_xnor_name'), rule: i18n.t('cheat_xnor_desc'), color: '#b5179e' },
+      { name: i18n.t('cheat_diode_name'), rule: i18n.t('cheat_diode_desc'), color: '#4cc9f0' },
+      { name: i18n.t('cheat_bridge_name'), rule: i18n.t('cheat_bridge_desc'), color: '#7209b7' },
+      { name: i18n.t('cheat_split_name'), rule: i18n.t('cheat_split_desc'), color: '#f72585' },
     ];
 
     let itemY = py + 62;
@@ -1397,7 +1407,7 @@ export class GameScene extends Phaser.Scene {
       itemY += 66;
     }
 
-    const closeBtn = this.add.text(GAME_WIDTH / 2, py + ph - 25, '[ ✕ ĐÓNG ]', {
+    const closeBtn = this.add.text(GAME_WIDTH / 2, py + ph - 25, i18n.t('btn_close'), {
       fontSize: '16px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -1597,13 +1607,13 @@ export class GameScene extends Phaser.Scene {
       starIcon = '⭐☆☆';
     }
 
-    const turnsWarning = remaining <= 3 ? ' ⚠️' : '';
-    this.movesText.setText(`LƯỢT: ${this.movesCount}/${this.maxMoves} (${remaining} CÒN)${turnsWarning} | CHUẨN: ${this.parMoves} ${starIcon}`);
+    const turnsWarning = remaining <= 3 ? ` ${i18n.t('moves_warning', { rem: remaining })}` : '';
+    this.movesText.setText(`${i18n.t('moves_label')}: ${this.movesCount}/${this.maxMoves} (${remaining} ${i18n.t('moves_rem_label')})${turnsWarning} | ${i18n.t('par_label')}: ${this.parMoves} ${starIcon}`);
     this.movesText.setColor(remaining <= 3 ? '#ff3344' : starColor);
   }
 
   private spawnRotationIndicator(x: number, y: number, direction: 1 | -1): void {
-    const iconText = direction === 1 ? '↻ PHẢI' : '↺ TRÁI';
+    const iconText = direction === 1 ? i18n.t('badge_rotate_right') : i18n.t('badge_rotate_left');
     const iconColor = direction === 1 ? '#ffd000' : '#00f0ff';
     const tag = this.add.text(x, y - 25, iconText, {
       fontSize: '13px',
@@ -1630,7 +1640,7 @@ export class GameScene extends Phaser.Scene {
     if (this.isOutOfMoves || this.isWon) return;
     this.isOutOfMoves = true;
     this.cameras.main.shake(250, 0.012);
-    this.showToast('🚫 HẾT LƯỢT XOAY! MẠCH CHƯA ĐẠT YÊU CẦU.');
+    this.showToast(i18n.getLanguage() === 'vi' ? '🚫 HẾT LƯỢT XOAY! MẠCH CHƯA ĐẠT YÊU CẦU.' : '🚫 OUT OF MOVES! CIRCUIT INCOMPLETE.');
     this.showOutOfMovesModal();
   }
 
@@ -1668,7 +1678,7 @@ export class GameScene extends Phaser.Scene {
     });
     icon.setOrigin(0.5);
 
-    const title = this.add.text(GAME_WIDTH / 2, py - 55, 'HẾT LƯỢT XOAY!', {
+    const title = this.add.text(GAME_WIDTH / 2, py - 55, i18n.t('out_of_moves_title'), {
       fontSize: '24px',
       fontFamily: 'monospace',
       color: '#ff2a55',
@@ -1679,7 +1689,7 @@ export class GameScene extends Phaser.Scene {
     const info = this.add.text(
       GAME_WIDTH / 2,
       py + 10,
-      `Bạn đã sử dụng hết ${this.maxMoves}/${this.maxMoves} lượt xoay!\nTiêu chuẩn 3 Sao của màn này là ${this.parMoves} lượt.\nHãy tính toán đường dẫn kỹ thuật số trước khi xoay.`,
+      i18n.t('out_of_moves_desc', { moves: this.maxMoves, max: this.maxMoves, par: this.parMoves }),
       {
         fontSize: '13px',
         fontFamily: 'monospace',
@@ -1697,7 +1707,7 @@ export class GameScene extends Phaser.Scene {
     const retryBg = this.add.graphics();
     retryBg.fillStyle(0xff2a55, 1);
     retryBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-    const retryText = this.add.text(0, 0, '🔄 THỬ LẠI NGAY', {
+    const retryText = this.add.text(0, 0, i18n.t('btn_retry'), {
       fontSize: '15px',
       fontFamily: 'monospace',
       color: '#ffffff',
@@ -1719,7 +1729,7 @@ export class GameScene extends Phaser.Scene {
     selectBg.lineStyle(1.5, 0x00f0ff, 0.7);
     selectBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
     selectBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-    const selectText = this.add.text(0, 0, '📋 DANH SÁCH MÀN CHƠI', {
+    const selectText = this.add.text(0, 0, i18n.t('btn_levels_list'), {
       fontSize: '14px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -1936,7 +1946,7 @@ export class GameScene extends Phaser.Scene {
         this.shortCircuitGraphics.fillCircle(midX, midY, 10);
       }
 
-      this.showToast('⚡ CẢNH BÁO: ĐOẢN MẠCH (NGẮN MẠCH)! HÃY TÁCH NGÕ RA!');
+      this.showToast(i18n.t('toast_short_circuit'));
     }
   }
 
@@ -2054,7 +2064,7 @@ export class GameScene extends Phaser.Scene {
       this.headerNextBtn.setVisible(true);
       const txt = this.headerNextBtn.list[1] as Phaser.GameObjects.Text;
       if (txt) {
-        txt.setText(this.isEndless ? '⏩ MÀN VÔ TẬN TIẾP ➔' : `⏩ QUA MÀN ${this.levelId + 1} ➔`);
+        txt.setText(this.isEndless ? i18n.t('btn_next_endless') : i18n.t('btn_next_level', { next: this.levelId + 1 }));
       }
     }
 
@@ -2076,7 +2086,7 @@ export class GameScene extends Phaser.Scene {
     const btnLabel = this.add.text(
       0,
       0,
-      this.isEndless ? '▶ TIẾP TỤC VÔ TẬN ➔' : `▶ QUA MÀN ${this.levelId + 1} ➔`,
+      this.isEndless ? i18n.t('btn_next_endless') : i18n.t('btn_next_level', { next: this.levelId + 1 }),
       {
         fontSize: '16px',
         fontFamily: 'monospace',
@@ -2151,7 +2161,9 @@ export class GameScene extends Phaser.Scene {
     const trophy = this.add.text(GAME_WIDTH / 2, py + 48, '🎉', { fontSize: '48px' });
     trophy.setOrigin(0.5);
 
-    const winTitle = this.isEndless ? `MÀN VÔ TẬN #${this.levelId - 100}!` : `HOÀN THÀNH MÀN ${this.levelId}!`;
+    const winTitle = this.isEndless
+      ? i18n.t('win_endless_title', { level: this.levelId - 100 })
+      : i18n.t('win_title', { level: this.levelId });
     const title = this.add.text(GAME_WIDTH / 2, py + 104, winTitle, {
       fontSize: '24px',
       fontFamily: 'monospace',
@@ -2164,10 +2176,11 @@ export class GameScene extends Phaser.Scene {
     const starsText = this.add.text(GAME_WIDTH / 2, py + 145, starIcons, { fontSize: '34px' });
     starsText.setOrigin(0.5);
 
+    const ratingText = starsCount === 3 ? i18n.t('rating_3_stars') : starsCount === 2 ? i18n.t('rating_2_stars') : i18n.t('rating_1_star');
     const statsText = this.add.text(
       GAME_WIDTH / 2,
       py + 195,
-      `LƯỢT XOAY: ${this.movesCount}/${this.maxMoves} (Chuẩn 3★: ${this.parMoves} lượt)\n${starsCount === 3 ? '🏆 ĐẠT TIÊU CHUẨN HOÀN HẢO (3 SAO)!' : starsCount === 2 ? '⚡ XUẤT SẮC (2 SAO)!' : '👍 HOÀN THÀNH (1 SAO)!'}`,
+      `${i18n.t('win_moves_stat', { moves: this.movesCount, max: this.maxMoves, par: this.parMoves })}\n${ratingText}`,
       {
         fontSize: '13px',
         fontFamily: 'monospace',
@@ -2190,7 +2203,9 @@ export class GameScene extends Phaser.Scene {
     const nextText = this.add.text(
       0,
       0,
-      this.isEndless ? '▶  MÀN VÔ TẬN TIẾP THEO' : `▶  TIẾP TỤC QUA MÀN ${this.levelId + 1}`,
+      this.isEndless
+        ? i18n.t('btn_next_endless')
+        : i18n.t('btn_continue_next', { next: this.levelId + 1 }),
       {
         fontSize: '15px',
         fontFamily: 'monospace',
@@ -2215,7 +2230,7 @@ export class GameScene extends Phaser.Scene {
     replayBg.lineStyle(1.5, 0x00a8cc, 0.9);
     replayBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
     replayBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    const replayText = this.add.text(0, 0, '🔄  CHƠI LẠI MÀN NÀY', {
+    const replayText = this.add.text(0, 0, i18n.t('btn_replay'), {
       fontSize: '14px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -2238,7 +2253,7 @@ export class GameScene extends Phaser.Scene {
     selectBg.lineStyle(1.5, 0x8888cc, 0.7);
     selectBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
     selectBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    const selectText = this.add.text(0, 0, '📋  DANH SÁCH MÀN CHƠI', {
+    const selectText = this.add.text(0, 0, i18n.t('btn_levels_list'), {
       fontSize: '14px',
       fontFamily: 'monospace',
       color: '#c0c8e0',

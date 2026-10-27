@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { ProgressManager } from '../utils/ProgressManager';
+import { i18n } from '../utils/i18n';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -16,6 +17,9 @@ export class MenuScene extends Phaser.Scene {
     const bg = this.add.graphics();
     const procGraphics = new ProceduralGraphics(this);
     procGraphics.drawBackground(bg, GAME_WIDTH, GAME_HEIGHT);
+
+    // Language Toggle Button (Top Right)
+    this.createLanguageToggle();
 
     // Title group
     const titleY = GAME_HEIGHT * 0.25;
@@ -47,7 +51,7 @@ export class MenuScene extends Phaser.Scene {
     const subtitle = this.add.text(
       GAME_WIDTH / 2,
       titleY + 110,
-      '— Nối mạch Kỹ thuật số —',
+      i18n.t('menu_subtitle'),
       {
         fontSize: '16px',
         fontFamily: 'monospace',
@@ -72,10 +76,15 @@ export class MenuScene extends Phaser.Scene {
     const buttonY = GAME_HEIGHT * 0.53;
     const buttonSpacing = 82;
 
+    const continueLabel =
+      unlockedLevel > 1
+        ? i18n.t('btn_continue', { level: unlockedLevel })
+        : i18n.t('btn_play_new');
+
     this.createButton(
       GAME_WIDTH / 2,
       buttonY,
-      `▶  CHƠI TIẾP (MÀN ${unlockedLevel})`,
+      continueLabel,
       () => {
         this.cameras.main.resetFX();
         this.scene.start('GameScene', { levelId: unlockedLevel });
@@ -85,7 +94,7 @@ export class MenuScene extends Phaser.Scene {
     this.createButton(
       GAME_WIDTH / 2,
       buttonY + buttonSpacing,
-      '📋  CHỌN MÀN CHƠI',
+      i18n.t('btn_select_level'),
       () => {
         this.cameras.main.resetFX();
         this.scene.start('LevelSelectScene');
@@ -95,27 +104,68 @@ export class MenuScene extends Phaser.Scene {
     this.createButton(
       GAME_WIDTH / 2,
       buttonY + buttonSpacing * 2,
-      '📖  HƯỚNG DẪN',
+      i18n.t('btn_tutorial'),
       () => {
         this.showTutorial();
       }
     );
 
-    // Footer
+    // Footer - Made by Tran Vu Luan
     const footer = this.add.text(
       GAME_WIDTH / 2,
       GAME_HEIGHT - 60,
-      'v1.0.0 • Made with Phaser 3',
+      i18n.t('footer_text'),
       {
-        fontSize: '12px',
+        fontSize: '13px',
         fontFamily: 'monospace',
-        color: '#334455',
+        color: '#4e6d8a',
+        fontStyle: 'bold',
       }
     );
     footer.setOrigin(0.5);
 
     // Decorative circuit elements
     this.drawDecorativeCircuit();
+  }
+
+  private createLanguageToggle(): void {
+    const lang = i18n.getLanguage();
+    const btnContainer = this.add.container(GAME_WIDTH - 65, 46);
+    btnContainer.setDepth(150);
+
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(0x0e243c, 0.95);
+    btnBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.85);
+    btnBg.fillRoundedRect(-46, -18, 92, 36, 18);
+    btnBg.strokeRoundedRect(-46, -18, 92, 36, 18);
+
+    const flagText = lang === 'vi' ? '🇻🇳 VI' : '🇬🇧 EN';
+    const label = this.add.text(0, 0, flagText, {
+      fontSize: '13px',
+      fontFamily: 'monospace',
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    label.setOrigin(0.5);
+
+    btnContainer.add([btnBg, label]);
+
+    const zone = this.add.zone(0, 0, 92, 36);
+    zone.setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', () => {
+      this.tweens.add({
+        targets: btnContainer,
+        scaleX: 0.9,
+        scaleY: 0.9,
+        duration: 70,
+        yoyo: true,
+        onComplete: () => {
+          i18n.toggleLanguage();
+          this.scene.restart();
+        },
+      });
+    });
+    btnContainer.add(zone);
   }
 
   private createButton(x: number, y: number, text: string, callback: () => void): void {
@@ -189,7 +239,7 @@ export class MenuScene extends Phaser.Scene {
     const tutorialText = this.add.text(
       GAME_WIDTH / 2,
       py + 40,
-      '📖 HƯỚNG DẪN CHƠI',
+      i18n.t('tutorial_title'),
       {
         fontSize: '24px',
         fontFamily: 'monospace',
@@ -200,38 +250,17 @@ export class MenuScene extends Phaser.Scene {
     tutorialText.setOrigin(0.5, 0);
     tutorialText.setDepth(102);
 
-    const instructions = [
-      '🎯 MỤC TIÊU:',
-      'Xoay các cổng logic để tín hiệu',
-      'đi từ nguồn → cổng → đèn LED.',
-      'Làm sáng TẤT CẢ đèn LED để thắng!',
-      '',
-      '👆 ĐIỀU KHIỂN:',
-      '• Chạm (Tap): Xoay cổng 90°',
-      '• Giữ lâu: Xem bảng chân trị',
-      '',
-      '⚡ CÁC CỔNG LOGIC:',
-      '• AND (&): Ra 1 khi cả 2 vào = 1',
-      '• OR (≥1): Ra 1 khi ít nhất 1 vào = 1',
-      '• XOR (=1): Ra 1 khi 2 vào khác nhau',
-      '• NOT (▷○): Đảo ngược tín hiệu',
-      '',
-      '💡 MẸO:',
-      'Dây xanh = tín hiệu 1 (HIGH)',
-      'Dây xám = tín hiệu 0 (LOW)',
-    ];
-
     const content = this.add.text(
       GAME_WIDTH / 2,
-      py + 90,
-      instructions.join('\n'),
+      py + 85,
+      i18n.t('tutorial_body'),
       {
-        fontSize: '15px',
+        fontSize: '14px',
         fontFamily: 'monospace',
         color: '#ccddee',
-        lineSpacing: 6,
+        lineSpacing: 4,
         align: 'left',
-        wordWrap: { width: pw - 60 },
+        wordWrap: { width: pw - 50 },
       }
     );
     content.setOrigin(0.5, 0);
@@ -240,12 +269,13 @@ export class MenuScene extends Phaser.Scene {
     // Close button
     const closeBtn = this.add.text(
       GAME_WIDTH / 2,
-      py + ph - 50,
-      '[ ĐÓNG ]',
+      py + ph - 45,
+      i18n.t('btn_close'),
       {
-        fontSize: '20px',
+        fontSize: '18px',
         fontFamily: 'monospace',
-        color: '#00aaff',
+        color: '#00f0ff',
+        fontStyle: 'bold',
       }
     );
     closeBtn.setOrigin(0.5);

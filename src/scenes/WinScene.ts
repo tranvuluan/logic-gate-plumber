@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { getLevels } from '../logic/LevelGenerator';
 import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
+import { i18n } from '../utils/i18n';
 
 export class WinScene extends Phaser.Scene {
   private levelId: number = 1;
@@ -70,7 +71,9 @@ export class WinScene extends Phaser.Scene {
     });
 
     // Win text
-    const winTitle = this.isEndless ? `VƯỢT MÀN VÔ TẬN #${this.levelId - 100}!` : 'HOÀN THÀNH MẠCH ĐIỆN!';
+    const winTitle = this.isEndless
+      ? i18n.t('win_endless_title', { level: this.levelId - 100 })
+      : i18n.t('win_title', { level: this.levelId });
     const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.35, winTitle, {
       fontSize: '32px',
       fontFamily: 'monospace',
@@ -96,10 +99,11 @@ export class WinScene extends Phaser.Scene {
     });
 
     // Performance info: Moves & Par
+    const ratingStr = this.stars === 3 ? i18n.t('rating_3_stars') : this.stars === 2 ? i18n.t('rating_2_stars') : i18n.t('rating_1_star');
     const moveInfo = this.add.text(
       GAME_WIDTH / 2,
       GAME_HEIGHT * 0.49,
-      `LƯỢT XOAY: ${this.moves} / CHUẨN: ${this.parMoves} BƯỚC\nĐánh giá: ${this.stars === 3 ? '🏆 HOÀN HẢO (3 SAO)' : this.stars === 2 ? '⚡ XUẤT SẮC (2 SAO)' : '👍 ĐẠT YÊU CẦU (1 SAO)'}`,
+      `${i18n.t('win_moves_stat', { moves: this.moves, max: this.parMoves + 4, par: this.parMoves })}\n${ratingStr}`,
       {
         fontSize: '15px',
         fontFamily: 'monospace',
@@ -115,7 +119,9 @@ export class WinScene extends Phaser.Scene {
     const hasNext = this.isEndless || this.levelId < MAX_LEVELS;
 
     if (hasNext) {
-      const nextLabel = this.isEndless ? '▶  MÀN VÔ TẬN TIẾP THEO' : '▶  MÀN TIẾP THEO';
+      const nextLabel = this.isEndless
+        ? i18n.t('btn_next_endless')
+        : i18n.t('btn_continue_next', { next: this.levelId + 1 });
       this.createButton(GAME_WIDTH / 2, btnY, nextLabel, '#00ff88', () => {
         this.cameras.main.resetFX();
         this.scene.start('GameScene', {
@@ -125,7 +131,7 @@ export class WinScene extends Phaser.Scene {
       });
     }
 
-    this.createButton(GAME_WIDTH / 2, btnY + 75, '🔄  CHƠI LẠI', '#00aaff', () => {
+    this.createButton(GAME_WIDTH / 2, btnY + 75, i18n.t('btn_replay'), '#00aaff', () => {
       this.cameras.main.resetFX();
       this.scene.start('GameScene', {
         levelId: this.levelId,
@@ -133,7 +139,7 @@ export class WinScene extends Phaser.Scene {
       });
     });
 
-    this.createButton(GAME_WIDTH / 2, btnY + 150, '📋  CHỌN MÀN', '#8888cc', () => {
+    this.createButton(GAME_WIDTH / 2, btnY + 150, i18n.t('btn_levels_list'), '#8888cc', () => {
       this.cameras.main.resetFX();
       this.scene.start('LevelSelectScene');
     });

@@ -3,20 +3,21 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { getLevels, generateEndlessLevel } from '../logic/LevelGenerator';
 import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
+import { i18n } from '../utils/i18n';
 
 interface ChapterInfo {
   id: number;
-  name: string;
+  nameKey: 'ch1_name' | 'ch2_name' | 'ch3_name' | 'ch4_name' | 'ch5_name';
   range: [number, number];
   tag: string;
 }
 
 const CHAPTERS: ChapterInfo[] = [
-  { id: 1, name: 'Khởi Nguyên', range: [1, 15], tag: 'CH 1' },
-  { id: 2, name: 'Cổng Đảo & Vượt Cáp', range: [16, 35], tag: 'CH 2' },
-  { id: 3, name: 'Khóa Cứng & Đa Trạng Thái', range: [36, 60], tag: 'CH 3' },
-  { id: 4, name: 'Xung Nhịp Chân Trị', range: [61, 85], tag: 'CH 4' },
-  { id: 5, name: 'Bậc Thầy Vi Mạch', range: [86, 100], tag: 'CH 5' },
+  { id: 1, nameKey: 'ch1_name', range: [1, 15], tag: 'CH 1' },
+  { id: 2, nameKey: 'ch2_name', range: [16, 35], tag: 'CH 2' },
+  { id: 3, nameKey: 'ch3_name', range: [36, 60], tag: 'CH 3' },
+  { id: 4, nameKey: 'ch4_name', range: [61, 85], tag: 'CH 4' },
+  { id: 5, nameKey: 'ch5_name', range: [86, 100], tag: 'CH 5' },
 ];
 
 export class LevelSelectScene extends Phaser.Scene {
@@ -59,7 +60,7 @@ export class LevelSelectScene extends Phaser.Scene {
     headerBg.lineBetween(0, 140, GAME_WIDTH, 140);
 
     // Back to Menu button
-    const backBtn = this.add.text(30, 36, '← MENU', {
+    const backBtn = this.add.text(30, 36, i18n.t('btn_back_menu'), {
       fontSize: '16px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -72,7 +73,7 @@ export class LevelSelectScene extends Phaser.Scene {
     });
 
     // Title
-    const title = this.add.text(GAME_WIDTH / 2, 28, 'CHỌN MÀN CHƠI', {
+    const title = this.add.text(GAME_WIDTH / 2, 28, i18n.t('level_select_title'), {
       fontSize: '24px',
       fontFamily: 'monospace',
       color: '#00ff88',
@@ -84,7 +85,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const subheader = this.add.text(
       GAME_WIDTH / 2,
       56,
-      `TIẾN ĐỘ: ${unlockedLevel}/${MAX_LEVELS}  ★ ${totalStars}/${MAX_LEVELS * 3}`,
+      i18n.t('progress_label', { unlocked: unlockedLevel, stars: totalStars }),
       {
         fontSize: '13px',
         fontFamily: 'monospace',
@@ -145,8 +146,9 @@ export class LevelSelectScene extends Phaser.Scene {
     }
 
     // Endless Mode Tab (Special 6th Tab)
+    const isVi = i18n.getLanguage() === 'vi';
     const endlessX = startX + 5 * (tabWidth + gap);
-    const endlessTab = this.createTabButton(endlessX, tabY, tabWidth, tabHeight, 'VÔ TẬN', 6);
+    const endlessTab = this.createTabButton(endlessX, tabY, tabWidth, tabHeight, isVi ? 'VÔ TẬN' : 'ENDLESS', 6);
     this.tabButtons.push(endlessTab);
   }
 
@@ -225,15 +227,20 @@ export class LevelSelectScene extends Phaser.Scene {
 
     if (this.currentChapter === 6) {
       // Endless Mode Screen
-      this.chapterTitleText.setText('🌌 CHẾ ĐỘ VÔ TẬN (ENDLESS MODE)');
-      this.chapterDescText.setText('Các siêu vi mạch ngẫu nhiên vô hạn. Kiểm tra bản lĩnh công trình sư!');
+      const isVi = i18n.getLanguage() === 'vi';
+      this.chapterTitleText.setText(isVi ? '🌌 CHẾ ĐỘ VÔ TẬN (ENDLESS MODE)' : '🌌 ENDLESS MODE');
+      this.chapterDescText.setText(isVi ? 'Các siêu vi mạch ngẫu nhiên vô hạn. Kiểm tra bản lĩnh công trình sư!' : 'Infinite procedural circuits. Test your engineering mastery!');
       this.renderEndlessMode();
       return;
     }
 
     const ch = CHAPTERS.find((c) => c.id === this.currentChapter)!;
-    this.chapterTitleText.setText(`CHƯƠNG ${ch.id}: ${ch.name.toUpperCase()}`);
-    this.chapterDescText.setText(`Màn ${ch.range[0]} – Màn ${ch.range[1]} • Lưới mở rộng`);
+    const isVi = i18n.getLanguage() === 'vi';
+    const chName = i18n.t(ch.nameKey);
+    const chLabel = isVi ? `CHƯƠNG ${ch.id}` : `CHAPTER ${ch.id}`;
+    const rangeLabel = isVi ? `Màn ${ch.range[0]} – Màn ${ch.range[1]}` : `Level ${ch.range[0]} – Level ${ch.range[1]}`;
+    this.chapterTitleText.setText(`${chLabel}: ${chName.toUpperCase()}`);
+    this.chapterDescText.setText(`${rangeLabel} • ${isVi ? 'Lưới mở rộng' : 'Expanding Grid'}`);
 
     const levels = getLevels().filter((l) => l.id >= ch.range[0] && l.id <= ch.range[1]);
     const unlockedLevel = ProgressManager.getUnlockedLevel();
@@ -264,8 +271,8 @@ export class LevelSelectScene extends Phaser.Scene {
         cardWidth,
         cardHeight,
         level.id,
-        level.name,
-        level.subtitle,
+        i18n.translateLevelName(level.id, level.name),
+        i18n.translateLevelSubtitle(level.id, level.subtitle),
         isUnlocked,
         isCurrent,
         stars
@@ -281,6 +288,7 @@ export class LevelSelectScene extends Phaser.Scene {
 
   private renderEndlessMode(): void {
     const streak = ProgressManager.getEndlessStreak();
+    const isVi = i18n.getLanguage() === 'vi';
 
     const card = this.add.container(GAME_WIDTH / 2, 140);
     const g = this.add.graphics();
@@ -295,7 +303,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const icon = this.add.text(0, -60, '🌌', { fontSize: '48px' });
     icon.setOrigin(0.5);
 
-    const title = this.add.text(0, -5, 'KHỞI CHẠY SIÊU MẠCH VÔ TẬN', {
+    const title = this.add.text(0, -5, isVi ? 'KHỞI CHẠY SIÊU MẠCH VÔ TẬN' : 'LAUNCH ENDLESS CIRCUIT', {
       fontSize: '18px',
       fontFamily: 'monospace',
       color: '#00f0ff',
@@ -303,7 +311,7 @@ export class LevelSelectScene extends Phaser.Scene {
     });
     title.setOrigin(0.5);
 
-    const score = this.add.text(0, 25, `KỶ LỤC CHUỖI THẮNG: ${streak} MÀN LIÊN TIẾP`, {
+    const score = this.add.text(0, 25, isVi ? `KỶ LỤC CHUỖI THẮNG: ${streak} MÀN LIÊN TIẾP` : `WIN STREAK RECORD: ${streak} LEVELS`, {
       fontSize: '13px',
       fontFamily: 'monospace',
       color: '#ffd000',
@@ -316,7 +324,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const bgBtn = this.add.graphics();
     bgBtn.fillStyle(0x00ff88, 1);
     bgBtn.fillRoundedRect(-140, -22, 280, 44, 8);
-    const playTxt = this.add.text(0, 0, '▶ BẮT ĐẦU CHƠI', {
+    const playTxt = this.add.text(0, 0, isVi ? '▶ BẮT ĐẦU CHƠI' : '▶ START GAME', {
       fontSize: '16px',
       fontFamily: 'monospace',
       color: '#05111f',
@@ -416,7 +424,8 @@ export class LevelSelectScene extends Phaser.Scene {
       const lockIcon = this.add.text(0, circleY, '🔒', { fontSize: '16px' });
       lockIcon.setOrigin(0.5);
 
-      const lockText = this.add.text(0, 14, `MÀN ${numStr}\nCHƯA MỞ`, {
+      const isVi = i18n.getLanguage() === 'vi';
+      const lockText = this.add.text(0, 14, isVi ? `MÀN ${numStr}\nCHƯA MỞ` : `LVL ${numStr}\nLOCKED`, {
         fontSize: '10px',
         fontFamily: 'monospace',
         color: '#4a627a',
@@ -474,17 +483,26 @@ export class LevelSelectScene extends Phaser.Scene {
     bottomBar.lineBetween(0, GAME_HEIGHT - 55, GAME_WIDTH, GAME_HEIGHT - 55);
     bottomBar.setDepth(100);
 
-    const resetBtn = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT - 28, '🔄 ĐẶT LẠI TIẾN TRÌNH VỀ MÀN 1', {
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      color: '#ff4466',
-      fontStyle: 'bold',
-    });
+    const isVi = i18n.getLanguage() === 'vi';
+    const resetBtn = this.add.text(
+      GAME_WIDTH / 2,
+      GAME_HEIGHT - 28,
+      isVi ? '🔄 ĐẶT LẠI TIẾN TRÌNH VỀ MÀN 1' : '🔄 RESET PROGRESS TO LEVEL 1',
+      {
+        fontSize: '12px',
+        fontFamily: 'monospace',
+        color: '#ff4466',
+        fontStyle: 'bold',
+      }
+    );
     resetBtn.setOrigin(0.5);
     resetBtn.setDepth(101);
     resetBtn.setInteractive({ useHandCursor: true });
     resetBtn.on('pointerdown', () => {
-      if (confirm('Bạn có chắc chắn muốn khóa lại toàn bộ các màn và chơi lại từ Màn 1?')) {
+      const msg = isVi
+        ? 'Bạn có chắc chắn muốn khóa lại toàn bộ các màn và chơi lại từ Màn 1?'
+        : 'Are you sure you want to lock all levels and restart from Level 1?';
+      if (confirm(msg)) {
         ProgressManager.resetProgress();
         this.cameras.main.resetFX();
         this.scene.restart();
