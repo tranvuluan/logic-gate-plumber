@@ -6,7 +6,11 @@ const apkMimePlugin = (): Plugin => ({
     server.middlewares.use((req, res, next) => {
       if (req.url && req.url.toLowerCase().includes('.apk')) {
         res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-        res.setHeader('Content-Disposition', 'attachment; filename="LogicGatePlumber.apk"');
+        res.setHeader('Content-Disposition', 'attachment; filename="LogicGatePlumber-release.apk"');
+      }
+      if (req.url && req.url.toLowerCase().includes('.aab')) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', 'attachment; filename="LogicGatePlumber-production.aab"');
       }
       next();
     });
@@ -15,7 +19,11 @@ const apkMimePlugin = (): Plugin => ({
     server.middlewares.use((req, res, next) => {
       if (req.url && req.url.toLowerCase().includes('.apk')) {
         res.setHeader('Content-Type', 'application/vnd.android.package-archive');
-        res.setHeader('Content-Disposition', 'attachment; filename="LogicGatePlumber.apk"');
+        res.setHeader('Content-Disposition', 'attachment; filename="LogicGatePlumber-release.apk"');
+      }
+      if (req.url && req.url.toLowerCase().includes('.aab')) {
+        res.setHeader('Content-Type', 'application/octet-stream');
+        res.setHeader('Content-Disposition', 'attachment; filename="LogicGatePlumber-production.aab"');
       }
       next();
     });

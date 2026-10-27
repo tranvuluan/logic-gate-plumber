@@ -174,25 +174,25 @@
     <p class="subtitle">Game giải đố xoay cổng logic số trên Mobile</p>
 
     <!-- Nút Tải APK trực tiếp -->
-    <a href="/LogicGatePlumber.apk" download="LogicGatePlumber.apk" class="btn-apk-big">
-      <span>⬇️</span> TẢI FILE APK ANDROID (4.2 MB)
+    <a href="./LogicGatePlumber-release.apk" download="LogicGatePlumber-release.apk" class="btn-apk-big">
+      <span>⬇️</span> TẢI FILE APK ANDROID PRODUCTION (CHÍNH THỨC)
     </a>
 
     <!-- Tab chọn chế độ -->
     <div class="tab-bar">
       <button id="tab-apk" class="tab-btn active" onclick="switchMode('apk')">Mã QR Tải APK</button>
-      <button id="tab-public" class="tab-btn" onclick="switchMode('public')">Chơi Web (5G/4G)</button>
+      <button id="tab-public" class="tab-btn" onclick="switchMode('public')">Chơi Web Trực Tuyến</button>
       <button id="tab-lan" class="tab-btn" onclick="switchMode('lan')">Mạng LAN Wi-Fi</button>
     </div>
 
     <!-- QR Code Container -->
     <div class="qr-container">
-      <img id="qr-img" src="/qr-apk.png" alt="QR Code" />
+      <img id="qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://tranvuluan.github.io/logic-gate-plumber/LogicGatePlumber-release.apk" alt="QR Code" style="width: 200px; height: 200px;" />
     </div>
 
     <!-- Link URL -->
     <div class="link-box">
-      <span id="link-text">https://applicant-dame-fly-basename.trycloudflare.com/LogicGatePlumber.apk</span>
+      <span id="link-text">https://tranvuluan.github.io/logic-gate-plumber/LogicGatePlumber-release.apk</span>
       <button class="btn-copy" onclick="copyLink()">Sao chép</button>
     </div>
 
@@ -200,18 +200,27 @@
     <div class="steps">
       <ol id="instructions-list">
         <li><strong>Bước 1:</strong> Dùng điện thoại quét mã QR hoặc bấm nút Tải APK màu xanh ở trên.</li>
-        <li><strong>Bước 2:</strong> Điện thoại sẽ tải file <code>LogicGatePlumber.apk</code> về máy.</li>
-        <li><strong>Bước 3:</strong> Mở file và chọn "Cài đặt" (cho phép nguồn này nếu máy hỏi). Cài xong là có app native chơi offline 100%!</li>
+        <li><strong>Bước 2:</strong> Điện thoại sẽ tải file <code>LogicGatePlumber-release.apk</code> về máy.</li>
+        <li><strong>Bước 3:</strong> Mở file và chọn "Cài đặt" (Bản release đã ký chứng chỉ sản xuất, tương thích 100% tất cả dòng máy Android 5 đến Android 15!).</li>
       </ol>
     </div>
 
-    <a href="/" class="btn-play">▶ CHƠI TRÊN TRÌNH DUYỆT NÀY</a>
+    <a href="./" class="btn-play">▶ CHƠI TRÊN TRÌNH DUYỆT NÀY</a>
   </div>
 
   <script>
-    const apkUrl = 'https://applicant-dame-fly-basename.trycloudflare.com/LogicGatePlumber.apk';
-    const publicUrl = 'https://applicant-dame-fly-basename.trycloudflare.com/';
-    const lanUrl = 'http://172.16.16.222:3000/';
+    const baseUrl = window.location.origin + window.location.pathname.replace(/\/qr\.html$/, '');
+    const apkUrl = baseUrl.includes('github.io') 
+      ? 'https://tranvuluan.github.io/logic-gate-plumber/LogicGatePlumber-release.apk'
+      : `${baseUrl}/LogicGatePlumber-release.apk`;
+    const publicUrl = baseUrl.includes('github.io')
+      ? 'https://tranvuluan.github.io/logic-gate-plumber/'
+      : `${baseUrl}/`;
+    const lanUrl = 'http://10.0.147.214:5173/';
+
+    function getQrUrl(dataUrl) {
+      return `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(dataUrl)}`;
+    }
 
     function switchMode(mode) {
       const qrImg = document.getElementById('qr-img');
@@ -226,29 +235,29 @@
       tabLan.classList.remove('active');
 
       if (mode === 'apk') {
-        qrImg.src = '/qr-apk.png';
+        qrImg.src = getQrUrl(apkUrl);
         linkText.textContent = apkUrl;
         tabApk.classList.add('active');
         instructions.innerHTML = `
-          <li><strong>Bước 1:</strong> Quét mã QR bằng Camera điện thoại.</li>
-          <li><strong>Bước 2:</strong> Điện thoại tự động tải file <code>LogicGatePlumber.apk</code> về máy.</li>
-          <li><strong>Bước 3:</strong> Bấm vào file vừa tải để cài đặt và chơi ngay lập tức không cần mạng!</li>
+          <li><strong>Bước 1:</strong> Quét mã QR bằng Camera điện thoại hoặc Zalo.</li>
+          <li><strong>Bước 2:</strong> Điện thoại tải file <code>LogicGatePlumber-release.apk</code>.</li>
+          <li><strong>Bước 3:</strong> Mở file để cài đặt trực tiếp. Bản Production tương thích 100% Android 5 - 15!</li>
         `;
       } else if (mode === 'public') {
-        qrImg.src = '/qr-public.png';
+        qrImg.src = getQrUrl(publicUrl);
         linkText.textContent = publicUrl;
         tabPublic.classList.add('active');
         instructions.innerHTML = `
-          <li><strong>Bước 1:</strong> Quét mã QR để mở bản Web qua mạng 4G/5G hoặc bất kỳ đâu.</li>
-          <li><strong>Bước 2:</strong> Có thể cài đặt thành PWA Full màn hình qua menu trình duyệt.</li>
+          <li><strong>Bước 1:</strong> Quét mã QR để mở bản Web trên điện thoại.</li>
+          <li><strong>Bước 2:</strong> Chơi mượt mà trực tiếp trên mọi trình duyệt.</li>
         `;
       } else {
-        qrImg.src = '/qr-lan.png';
+        qrImg.src = getQrUrl(lanUrl);
         linkText.textContent = lanUrl;
         tabLan.classList.add('active');
         instructions.innerHTML = `
-          <li><strong>Bước 1:</strong> Kết nối điện thoại cùng Wi-Fi / Hotspot với máy tính.</li>
-          <li><strong>Bước 2:</strong> Quét mã QR để truy cập trực tiếp qua mạng nội bộ LAN siêu tốc.</li>
+          <li><strong>Bước 1:</strong> Kết nối điện thoại cùng Wi-Fi với máy tính.</li>
+          <li><strong>Bước 2:</strong> Quét mã QR để truy cập trực tiếp qua mạng nội bộ LAN.</li>
         `;
       }
     }

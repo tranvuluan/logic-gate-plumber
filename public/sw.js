@@ -33,6 +33,19 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  // CRITICAL: Do NOT intercept APK/AAB downloads or non-GET requests.
+  // Allow Android Download Manager and mobile browsers to handle binary package streams directly.
+  const url = event.request.url.toLowerCase();
+  if (
+    event.request.method !== 'GET' ||
+    url.endsWith('.apk') ||
+    url.includes('.apk') ||
+    url.endsWith('.aab') ||
+    url.includes('.aab')
+  ) {
+    return;
+  }
+
   // Stale-while-revalidate / Network first fallback
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
