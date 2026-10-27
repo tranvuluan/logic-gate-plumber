@@ -113,6 +113,7 @@ export interface GateDefinition {
 // Multi-Test-Case definition (Truth Table testing)
 export interface TestCase {
   name?: string;
+  description?: string;
   sources: { row: number; col: number; value: number }[];
   leds: { row: number; col: number; targetSignal: number }[];
 }
