@@ -4,6 +4,7 @@ import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { getLevels } from '../logic/LevelGenerator';
 import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
+import { audio } from '../utils/AudioManager';
 
 export class WinScene extends Phaser.Scene {
   private levelId: number = 1;
@@ -33,6 +34,7 @@ export class WinScene extends Phaser.Scene {
   }
 
   create(): void {
+    audio.playWin();
     this.cameras.main.resetFX();
     this.cameras.main.setAlpha(1);
 
@@ -175,6 +177,7 @@ export class WinScene extends Phaser.Scene {
     const zone = this.add.zone(x, y, btnW, btnH);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.tweens.add({
         targets: [label],
         scaleX: 0.9,

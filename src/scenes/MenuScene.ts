@@ -3,6 +3,7 @@ import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { ProgressManager } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
+import { audio } from '../utils/AudioManager';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -18,8 +19,15 @@ export class MenuScene extends Phaser.Scene {
     const procGraphics = new ProceduralGraphics(this);
     procGraphics.drawBackground(bg, GAME_WIDTH, GAME_HEIGHT);
 
-    // Language Toggle Button (Top Right)
+    // Top Header Action Buttons: Language & Sound
     this.createLanguageToggle();
+    this.createAudioToggle();
+
+    // Auto-resume audio & ambient BGM on first user touch/click
+    this.input.once('pointerdown', () => {
+      audio.resume();
+      audio.startBGM();
+    });
 
     // Title group
     const titleY = GAME_HEIGHT * 0.25;
@@ -153,6 +161,7 @@ export class MenuScene extends Phaser.Scene {
     const zone = this.add.zone(0, 0, 92, 36);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.tweens.add({
         targets: btnContainer,
         scaleX: 0.9,
@@ -163,6 +172,44 @@ export class MenuScene extends Phaser.Scene {
           i18n.toggleLanguage();
           this.scene.restart();
         },
+      });
+    });
+    btnContainer.add(zone);
+  }
+
+  private createAudioToggle(): void {
+    const isMuted = audio.isMuted();
+    const btnContainer = this.add.container(GAME_WIDTH - 138, 46);
+    btnContainer.setDepth(150);
+
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(0x0e243c, 0.95);
+    btnBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.85);
+    btnBg.fillRoundedRect(-22, -18, 44, 36, 18);
+    btnBg.strokeRoundedRect(-22, -18, 44, 36, 18);
+
+    const icon = this.add.text(0, 0, isMuted ? '🔇' : '🔊', {
+      fontSize: '16px',
+    });
+    icon.setOrigin(0.5);
+
+    btnContainer.add([btnBg, icon]);
+
+    const zone = this.add.zone(0, 0, 44, 36);
+    zone.setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', () => {
+      const nowMuted = audio.toggleMute();
+      icon.setText(nowMuted ? '🔇' : '🔊');
+      if (!nowMuted) {
+        audio.playButtonClick();
+        audio.startBGM();
+      }
+      this.tweens.add({
+        targets: btnContainer,
+        scaleX: 0.88,
+        scaleY: 0.88,
+        duration: 70,
+        yoyo: true,
       });
     });
     btnContainer.add(zone);
@@ -206,6 +253,7 @@ export class MenuScene extends Phaser.Scene {
     });
 
     hitZone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.tweens.add({
         targets: [bg, label],
         scaleX: 0.95,
@@ -282,6 +330,7 @@ export class MenuScene extends Phaser.Scene {
     closeBtn.setDepth(102);
     closeBtn.setInteractive({ useHandCursor: true });
     closeBtn.on('pointerdown', () => {
+      audio.playButtonClick();
       overlay.destroy();
       panel.destroy();
       tutorialText.destroy();

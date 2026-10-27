@@ -4,6 +4,7 @@ import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { getLevels, generateEndlessLevel } from '../logic/LevelGenerator';
 import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
+import { audio } from '../utils/AudioManager';
 
 interface ChapterInfo {
   id: number;
@@ -68,6 +69,7 @@ export class LevelSelectScene extends Phaser.Scene {
     });
     backBtn.setInteractive({ useHandCursor: true });
     backBtn.on('pointerdown', () => {
+      audio.playButtonClick();
       this.cameras.main.resetFX();
       this.scene.start('MenuScene');
     });
@@ -185,6 +187,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const zone = this.add.zone(0, 0, w, h);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
+      audio.playButtonClick();
       if (this.currentChapter !== chapterId) {
         this.currentChapter = chapterId;
         this.scrollY = 0;
@@ -336,6 +339,7 @@ export class LevelSelectScene extends Phaser.Scene {
     const zone = this.add.zone(0, 0, 280, 44);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.cameras.main.resetFX();
       this.scene.start('GameScene', { levelId: 101, isEndless: true });
     });
@@ -407,6 +411,7 @@ export class LevelSelectScene extends Phaser.Scene {
       const hitZone = this.add.zone(0, 0, w, h);
       hitZone.setInteractive({ useHandCursor: true });
       hitZone.on('pointerdown', () => {
+        audio.playButtonClick();
         this.cameras.main.resetFX();
         this.scene.start('GameScene', { levelId });
       });

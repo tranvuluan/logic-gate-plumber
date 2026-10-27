@@ -18,6 +18,7 @@ import { VirtualJoystick } from '../utils/VirtualJoystick';
 import { getLevels, generateEndlessLevel } from '../logic/LevelGenerator';
 import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
+import { audio } from '../utils/AudioManager';
 
 interface CellSprite {
   container: Phaser.GameObjects.Container;
@@ -278,6 +279,7 @@ export class GameScene extends Phaser.Scene {
     backBtnContainer.add([backBg, backBtnText]);
 
     backBg.on('pointerdown', () => {
+      audio.playButtonClick();
       this.cleanupAndNavigate('LevelSelectScene');
     });
 
@@ -338,6 +340,7 @@ export class GameScene extends Phaser.Scene {
     this.headerNextBtn.setVisible(false);
 
     nextHdrBg.on('pointerdown', () => {
+      audio.playButtonClick();
       this.loadNextLevel(this.levelId + 1);
     });
 
@@ -350,6 +353,27 @@ export class GameScene extends Phaser.Scene {
     });
     this.timerText.setOrigin(1, 0);
     this.timerText.setDepth(1000);
+
+    // Audio Sound Toggle Button
+    const audioContainer = this.add.container(GAME_WIDTH - 138, 66);
+    audioContainer.setDepth(1002);
+    const audioBg = this.add.rectangle(0, 0, 38, 30, 0x10253f, 0.92);
+    audioBg.setStrokeStyle(1.5, 0x00f0ff, 0.8);
+    audioBg.setInteractive({ useHandCursor: true });
+    const audioIcon = this.add.text(0, 0, audio.isMuted() ? '🔇' : '🔊', {
+      fontSize: '15px',
+    });
+    audioIcon.setOrigin(0.5);
+    audioContainer.add([audioBg, audioIcon]);
+
+    audioBg.on('pointerdown', () => {
+      const nowMuted = audio.toggleMute();
+      audioIcon.setText(nowMuted ? '🔇' : '🔊');
+      if (!nowMuted) {
+        audio.playButtonClick();
+        audio.startBGM();
+      }
+    });
 
     // Restart button
     const restartContainer = this.add.container(GAME_WIDTH - 65, 66);
@@ -367,6 +391,7 @@ export class GameScene extends Phaser.Scene {
     restartContainer.add([restartBg, restartText]);
 
     restartBg.on('pointerdown', () => {
+      audio.playButtonClick();
       this.restartCurrentLevel();
     });
   }
@@ -1293,6 +1318,7 @@ export class GameScene extends Phaser.Scene {
     target.cell.locked = true;
 
     this.availableHints--;
+    audio.playHint();
     if (this.hintBtnText) {
       this.hintBtnText.setText(`${i18n.t('btn_hint')} (${Math.max(0, this.availableHints)})`);
     }
@@ -1639,6 +1665,7 @@ export class GameScene extends Phaser.Scene {
   private triggerOutOfMoves(): void {
     if (this.isOutOfMoves || this.isWon) return;
     this.isOutOfMoves = true;
+    audio.playFail();
     this.cameras.main.shake(250, 0.012);
     this.showToast(i18n.getLanguage() === 'vi' ? '🚫 HẾT LƯỢT XOAY! MẠCH CHƯA ĐẠT YÊU CẦU.' : '🚫 OUT OF MOVES! CIRCUIT INCOMPLETE.');
     this.showOutOfMovesModal();
@@ -1719,6 +1746,7 @@ export class GameScene extends Phaser.Scene {
     const retryZone = this.add.zone(0, 0, btnW, btnH);
     retryZone.setInteractive({ useHandCursor: true });
     retryZone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.restartCurrentLevel();
     });
     retryBtn.add(retryZone);
@@ -1741,6 +1769,7 @@ export class GameScene extends Phaser.Scene {
     const selectZone = this.add.zone(0, 0, btnW, btnH);
     selectZone.setInteractive({ useHandCursor: true });
     selectZone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.cleanupAndNavigate('LevelSelectScene');
     });
     selectBtn.add(selectZone);
@@ -1791,7 +1820,8 @@ export class GameScene extends Phaser.Scene {
 
     this.isAnimating = true;
 
-    // Apply rotation
+    // Apply rotation & sound
+    audio.playRotate(direction);
     if (cell.type === GateType.WIRE) {
       cell.rotation = (cell.rotation + 1) % 2;
     } else {
@@ -1808,6 +1838,7 @@ export class GameScene extends Phaser.Scene {
 
     const onCompleteRotation = () => {
       this.drawGateInCell(row, col);
+      audio.playFlow();
       this.propagateSignals();
       this.isAnimating = false;
 
@@ -1998,6 +2029,7 @@ export class GameScene extends Phaser.Scene {
 
   private celebrateWinAndShowModal(): void {
     try {
+      audio.playWin();
       let starsCount = 1;
       if (this.movesCount <= this.parMoves) {
         starsCount = 3;
@@ -2219,6 +2251,7 @@ export class GameScene extends Phaser.Scene {
     const nextZone = this.add.zone(0, 0, btnW, btnH);
     nextZone.setInteractive({ useHandCursor: true });
     nextZone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.loadNextLevel(this.levelId + 1);
     });
     nextBtnContainer.add(nextZone);
@@ -2242,6 +2275,7 @@ export class GameScene extends Phaser.Scene {
     const replayZone = this.add.zone(0, 0, btnW, btnH);
     replayZone.setInteractive({ useHandCursor: true });
     replayZone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.restartCurrentLevel();
     });
     replayBtnContainer.add(replayZone);
@@ -2265,6 +2299,7 @@ export class GameScene extends Phaser.Scene {
     const selectZone = this.add.zone(0, 0, btnW, btnH);
     selectZone.setInteractive({ useHandCursor: true });
     selectZone.on('pointerdown', () => {
+      audio.playButtonClick();
       this.cleanupAndNavigate('LevelSelectScene');
     });
     selectBtnContainer.add(selectZone);
