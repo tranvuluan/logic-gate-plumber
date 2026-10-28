@@ -93,6 +93,15 @@ export class GameScene extends Phaser.Scene {
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasdKeys?: { [key: string]: Phaser.Input.Keyboard.Key };
 
+  // Dynamic Floating Joystick (Phím di chuyển linh động theo vị trí tay)
+  private joystickContainer!: Phaser.GameObjects.Container;
+  private joystickKnob!: Phaser.GameObjects.Graphics;
+  private isJoystickActive: boolean = false;
+  private activePointerId: number | null = null;
+  private joystickOrigin: { x: number; y: number } = { x: 0, y: 0 };
+  private dynamicMoveVector: { x: number; y: number } = { x: 0, y: 0 };
+  private readonly JOYSTICK_MAX_RADIUS: number = 55;
+
   // Level 1 tutorial pointer
   private tutorialPointer?: Phaser.GameObjects.Container;
 
@@ -113,6 +122,9 @@ export class GameScene extends Phaser.Scene {
     this.cheatSheetGroup = null;
     this.activeHoveredCell = null;
     this.selectedCell = null;
+    this.isJoystickActive = false;
+    this.activePointerId = null;
+    this.dynamicMoveVector = { x: 0, y: 0 };
   }
 
   create(): void {
@@ -267,8 +279,8 @@ export class GameScene extends Phaser.Scene {
     // Keyboard controls
     this.setupKeyboardControls();
 
-    // Touch & Swipe controls
-    this.setupTouchControls();
+    // Dynamic Floating Joystick (Phím di chuyển linh động)
+    this.setupDynamicFloatingJoystick();
 
     // Initial signal propagation
     this.propagateSignals();
@@ -502,51 +514,37 @@ export class GameScene extends Phaser.Scene {
     // Render default inspector
     this.renderDefaultInspector();
 
-    // Bottom Controls: Cyberpunk Virtual D-Pad (Left) + Action Buttons (Right)
+    // Bottom Action Buttons (Rotate Left, Rotate Right, Guide)
     const isVi = i18n.getLanguage() === 'vi';
-    const dpadCenterX = px + 115;
-    const dpadCenterY = botPy + botPh - 86;
-    this.createVirtualDPad(dpadCenterX, dpadCenterY);
-
-    const dpadLabel = this.add.text(dpadCenterX, botPy + botPh - 18, isVi ? '🎮 DI CHUYỂN' : '🎮 MOVE', {
-      fontSize: '11px',
-      fontFamily: FONTS.TITLE,
-      color: '#00f0ff',
-      fontStyle: 'bold',
-    });
-    dpadLabel.setOrigin(0.5);
-    dpadLabel.setDepth(82);
-
-    // Right Action Buttons
-    const actionBtnY = botPy + botPh - 86;
-    const rotLeftW = 125;
-    const rotRightW = 150;
-    const cheatW = 110;
+    const actionBtnY = botPy + botPh - 54;
+    const btnW1 = 180;
+    const btnW2 = 250;
+    const btnW3 = 180;
 
     // Rotate Left CCW
-    this.createPanelButton(px + 295, actionBtnY, rotLeftW, 56, i18n.t('btn_rotate_left'), COLORS.CYBER_CYAN, () => {
+    this.createPanelButton(px + 16 + btnW1 / 2, actionBtnY, btnW1, 52, i18n.t('btn_rotate_left'), COLORS.CYBER_CYAN, () => {
       this.rotateSelectedOrTargetGate(-1);
     });
 
     // Rotate Right CW (Primary)
-    this.createPanelButton(px + 445, actionBtnY, rotRightW, 56, i18n.t('btn_rotate_right'), COLORS.SIGNAL_ON, () => {
+    this.createPanelButton(px + pw / 2, actionBtnY, btnW2, 52, i18n.t('btn_rotate_right'), COLORS.SIGNAL_ON, () => {
       this.rotateSelectedOrTargetGate(1);
     });
 
     // Cheat Sheet
-    this.createPanelButton(px + 585, actionBtnY, cheatW, 56, `📖 ${i18n.t('btn_cheat_sheet')}`, COLORS.CYBER_YELLOW, () => {
+    this.createPanelButton(px + pw - 16 - btnW3 / 2, actionBtnY, btnW3, 52, `📖 ${i18n.t('btn_cheat_sheet')}`, COLORS.CYBER_YELLOW, () => {
       this.toggleCheatSheet();
     });
 
     // Subtitle helper for touch
     const touchHelper = this.add.text(
-      px + 440,
-      botPy + botPh - 18,
-      isVi ? '📱 Chạm ô bất kỳ để đi tới & xoay' : '📱 Tap any cell to walk & rotate',
+      px + pw / 2,
+      botPy + botPh - 14,
+      isVi ? '🕹️ Chạm & Kéo bất kỳ đâu để di chuyển linh động  •  Chạm ô để xoay' : '🕹️ Touch & Drag anywhere for dynamic joystick  •  Tap cell to rotate',
       {
         fontSize: '11px',
         fontFamily: FONTS.UI,
-        color: '#6e93b8',
+        color: '#00f0ff',
       }
     );
     touchHelper.setOrigin(0.5);
@@ -1762,32 +1760,184 @@ export class GameScene extends Phaser.Scene {
     this.activeHoveredCell = { row: startR, col: startC };
   }
 
-  private setupTouchControls(): void {
-    let touchStartX = 0;
-    let touchStartY = 0;
-    let touchStartTime = 0;
+  private setupDynamicFloatingJoystick(): void {
+    const isPort = OrientationManager.isPortrait(this);
+    const startX = isPort ? 130 : 160;
+    const startY = isPort ? 690 : 540;
 
-    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
-      touchStartX = p.x;
-      touchStartY = p.y;
-      touchStartTime = Date.now();
+    // 1. Create Joystick Container at high depth (above everything)
+    this.joystickContainer = this.add.container(startX, startY);
+    this.joystickContainer.setDepth(250);
+
+    // 2. Base Graphics (Outer Cyber Ring, Direction Arrows, & Crosshairs)
+    const baseG = this.add.graphics();
+    baseG.fillStyle(0x06152b, 0.65);
+    baseG.lineStyle(2, COLORS.CYBER_CYAN, 0.85);
+    baseG.fillCircle(0, 0, this.JOYSTICK_MAX_RADIUS);
+    baseG.strokeCircle(0, 0, this.JOYSTICK_MAX_RADIUS);
+
+    // Outer glow ring
+    baseG.lineStyle(1, COLORS.CYBER_CYAN, 0.35);
+    baseG.strokeCircle(0, 0, this.JOYSTICK_MAX_RADIUS + 8);
+
+    // 4 Directional Arrows on Base
+    const arrowDist = 42;
+    baseG.fillStyle(COLORS.CYBER_CYAN, 0.9);
+    // Up ▲
+    baseG.fillTriangle(0, -arrowDist - 6, -6, -arrowDist + 4, 6, -arrowDist + 4);
+    // Down ▼
+    baseG.fillTriangle(0, arrowDist + 6, -6, arrowDist - 4, 6, arrowDist - 4);
+    // Left ◀
+    baseG.fillTriangle(-arrowDist - 6, 0, -arrowDist + 4, -6, -arrowDist + 4, 6);
+    // Right ▶
+    baseG.fillTriangle(arrowDist + 6, 0, arrowDist - 4, -6, arrowDist - 4, 6);
+
+    // 3. Knob Graphics (Inner Stick with Core Glow)
+    this.joystickKnob = this.add.graphics();
+    this.joystickKnob.fillStyle(0x0e2e54, 0.95);
+    this.joystickKnob.lineStyle(2.5, COLORS.SIGNAL_ON, 1);
+    this.joystickKnob.fillCircle(0, 0, 24);
+    this.joystickKnob.strokeCircle(0, 0, 24);
+
+    // Core neon glow
+    this.joystickKnob.fillStyle(COLORS.SIGNAL_ON, 0.85);
+    this.joystickKnob.fillCircle(0, 0, 10);
+
+    // Label on base
+    const hintText = this.add.text(0, this.JOYSTICK_MAX_RADIUS + 16, i18n.getLanguage() === 'vi' ? '🕹️ CẦN LINH ĐỘNG' : '🕹️ DYNAMIC JOYSTICK', {
+      fontSize: '10px',
+      fontFamily: FONTS.TITLE,
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    hintText.setOrigin(0.5);
+
+    this.joystickContainer.add([baseG, this.joystickKnob, hintText]);
+
+    // Idle pulse animation so player immediately notices it on screen
+    this.joystickContainer.setAlpha(0.65);
+    this.tweens.add({
+      targets: this.joystickContainer,
+      alpha: { from: 0.45, to: 0.8 },
+      duration: 1200,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
     });
 
-    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
-      const dx = p.x - touchStartX;
-      const dy = p.y - touchStartY;
-      const dt = Date.now() - touchStartTime;
+    let touchDownTime = 0;
+    let touchDownPos = { x: 0, y: 0 };
+
+    // 4. Global Dynamic Pointer Handlers
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (this.isWon || this.isTimeOver || this.isOutOfMoves) return;
+
+      // Ignore touches on top header bar
+      if (pointer.y < 64) return;
+
+      // Ignore touches on bottom action buttons
+      const isPortraitNow = OrientationManager.isPortrait(this);
+      const botLimit = isPortraitNow ? 1160 : 640;
+      if (pointer.y > botLimit && pointer.x > (isPortraitNow ? 200 : 980)) return;
+
+      // LINH ĐỘNG: Di chuyển cần gạt đến chính xác vị trí ngón tay chạm vào!
+      this.tweens.killTweensOf(this.joystickContainer);
+      this.joystickContainer.setPosition(pointer.x, pointer.y);
+      this.joystickContainer.setVisible(true);
+      this.joystickContainer.setAlpha(1);
+      this.joystickKnob.setPosition(0, 0);
+
+      this.isJoystickActive = true;
+      this.activePointerId = pointer.id;
+      this.joystickOrigin = { x: pointer.x, y: pointer.y };
+      this.dynamicMoveVector = { x: 0, y: 0 };
+
+      touchDownTime = Date.now();
+      touchDownPos = { x: pointer.x, y: pointer.y };
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (!this.isJoystickActive || pointer.id !== this.activePointerId) return;
+
+      const dx = pointer.x - this.joystickOrigin.x;
+      const dy = pointer.y - this.joystickOrigin.y;
       const dist = Math.hypot(dx, dy);
 
-      // Swipe detected (> 35px within 450ms)
-      if (dist > 35 && dt < 450) {
-        if (Math.abs(dx) > Math.abs(dy)) {
-          this.movePlayerDirection(0, dx > 0 ? 1 : -1);
-        } else {
-          this.movePlayerDirection(dy > 0 ? 1 : -1, 0);
-        }
+      if (dist > 6) {
+        const angle = Math.atan2(dy, dx);
+        const clampedDist = Math.min(dist, this.JOYSTICK_MAX_RADIUS);
+        this.joystickKnob.setPosition(Math.cos(angle) * clampedDist, Math.sin(angle) * clampedDist);
+
+        const power = clampedDist / this.JOYSTICK_MAX_RADIUS;
+        this.dynamicMoveVector.x = Math.cos(angle) * power;
+        this.dynamicMoveVector.y = Math.sin(angle) * power;
+      } else {
+        this.dynamicMoveVector.x = 0;
+        this.dynamicMoveVector.y = 0;
+        this.joystickKnob.setPosition(0, 0);
       }
     });
+
+    const onPointerRelease = (pointer: Phaser.Input.Pointer) => {
+      if (!this.isJoystickActive || pointer.id !== this.activePointerId) return;
+
+      this.isJoystickActive = false;
+      this.activePointerId = null;
+      this.dynamicMoveVector = { x: 0, y: 0 };
+
+      const totalDist = Math.hypot(pointer.x - touchDownPos.x, pointer.y - touchDownPos.y);
+      const dt = Date.now() - touchDownTime;
+
+      // Fade joystick back to gentle idle state
+      this.tweens.add({
+        targets: this.joystickContainer,
+        alpha: 0.45,
+        duration: 220,
+        onComplete: () => {
+          this.joystickKnob.setPosition(0, 0);
+        },
+      });
+
+      if (totalDist > 16) {
+        // Drag release: Snap player to center of current cell smoothly
+        const col = Phaser.Math.Clamp(Math.floor((this.player.x - this.boardOffsetX) / this.cellSize), 0, this.gridWidth - 1);
+        const row = Phaser.Math.Clamp(Math.floor((this.player.y - this.boardOffsetY) / this.cellSize), 0, this.gridHeight - 1);
+        const targetX = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
+        const targetY = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
+
+        this.tweens.add({
+          targets: this.player,
+          x: targetX,
+          y: targetY,
+          duration: 90,
+          ease: 'Sine.easeOut',
+        });
+
+        this.selectedCell = { row, col };
+        this.activeHoveredCell = { row, col };
+        const cell = this.grid[row]?.[col];
+        if (cell) this.renderGateInspector(cell, row, col);
+      } else if (dt < 320) {
+        // Quick TAP: Check if tapped on a cell on the board
+        const col = Math.floor((pointer.x - this.boardOffsetX) / this.cellSize);
+        const row = Math.floor((pointer.y - this.boardOffsetY) / this.cellSize);
+        if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
+          const cellDef = this.grid[row]?.[col];
+          this.selectedCell = { row, col };
+          this.activeHoveredCell = { row, col };
+          if (cellDef) this.renderGateInspector(cellDef, row, col);
+
+          this.movePlayerToCell(row, col, () => {
+            if (cellDef && !cellDef.fixed && !cellDef.locked && cellDef.type !== GateType.SOURCE && cellDef.type !== GateType.LED) {
+              this.handleCellTap(row, col, 1);
+            }
+          });
+        }
+      }
+    };
+
+    this.input.on('pointerup', onPointerRelease);
+    this.input.on('pointerout', onPointerRelease);
   }
 
   private movePlayerToCell(row: number, col: number, onArrival?: () => void): void {
@@ -1866,92 +2016,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.movePlayerToCell(nextRow, nextCol);
-  }
-
-  private createVirtualDPad(centerX: number, centerY: number): void {
-    const btnSize = 42;
-    const spacing = 46;
-
-    // Cyberpunk circular backdrop
-    const padBg = this.add.graphics();
-    padBg.fillStyle(0x06152b, 0.85);
-    padBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.4);
-    padBg.fillCircle(centerX, centerY, 68);
-    padBg.strokeCircle(centerX, centerY, 68);
-    padBg.setDepth(85);
-
-    // Center icon
-    const centerBadge = this.add.text(centerX, centerY, '⚡', {
-      fontSize: '18px',
-      color: '#00f0ff',
-    });
-    centerBadge.setOrigin(0.5);
-    centerBadge.setDepth(86);
-
-    const directions = [
-      { dRow: -1, dCol: 0, x: centerX, y: centerY - spacing, icon: '▲' },
-      { dRow: 1, dCol: 0, x: centerX, y: centerY + spacing, icon: '▼' },
-      { dRow: 0, dCol: -1, x: centerX - spacing, y: centerY, icon: '◀' },
-      { dRow: 0, dCol: 1, x: centerX + spacing, y: centerY, icon: '▶' },
-    ];
-
-    directions.forEach((dir) => {
-      const btn = this.add.container(dir.x, dir.y);
-      btn.setDepth(87);
-
-      const bg = this.add.graphics();
-      bg.fillStyle(0x102540, 0.95);
-      bg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.75);
-      bg.fillRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
-      bg.strokeRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
-
-      const txt = this.add.text(0, 0, dir.icon, {
-        fontSize: '17px',
-        color: '#00f0ff',
-        fontStyle: 'bold',
-      });
-      txt.setOrigin(0.5);
-
-      const hit = this.add.rectangle(0, 0, btnSize + 8, btnSize + 8, 0x000000, 0.001);
-      hit.setInteractive({ useHandCursor: true });
-
-      btn.add([bg, txt, hit]);
-
-      let repeatTimer: Phaser.Time.TimerEvent | null = null;
-
-      const startMove = () => {
-        this.movePlayerDirection(dir.dRow, dir.dCol);
-        bg.clear();
-        bg.fillStyle(COLORS.CYBER_CYAN, 0.4);
-        bg.lineStyle(2, 0x00ff9d, 1);
-        bg.fillRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
-        bg.strokeRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
-
-        if (repeatTimer) repeatTimer.remove(false);
-        repeatTimer = this.time.addEvent({
-          delay: 170,
-          callback: () => this.movePlayerDirection(dir.dRow, dir.dCol),
-          loop: true,
-          startAt: -80,
-        });
-      };
-
-      const stopMove = () => {
-        if (repeatTimer) {
-          repeatTimer.remove(false);
-          repeatTimer = null;
-        }
-        bg.clear();
-        bg.fillStyle(0x102540, 0.95);
-        bg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.75);
-        bg.fillRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
-        bg.strokeRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
-      };
-
-      hit.on('pointerdown', startMove);
-      hit.on('pointerup', stopMove);
-      hit.on('pointerout', stopMove);
-    });
   }
 
   private propagateSignals(): void {
@@ -2543,51 +2607,59 @@ export class GameScene extends Phaser.Scene {
       this.updateTimerBar();
     }
 
-    // Arrow keys & WASD player movement
-    if (this.player && (this.cursors || this.wasdKeys) && !this.isWon && !this.isTimeOver && !this.isOutOfMoves) {
-      let vx = 0;
-      let vy = 0;
+    // Arrow keys & WASD player movement OR Dynamic Floating Joystick
+    let vx = 0;
+    let vy = 0;
 
-      if (this.cursors?.left.isDown || this.wasdKeys?.A.isDown) vx -= 1;
-      if (this.cursors?.right.isDown || this.wasdKeys?.D.isDown) vx += 1;
-      if (this.cursors?.up.isDown || this.wasdKeys?.W.isDown) vy -= 1;
-      if (this.cursors?.down.isDown || this.wasdKeys?.S.isDown) vy += 1;
+    if (this.cursors?.left.isDown || this.wasdKeys?.A.isDown) vx -= 1;
+    if (this.cursors?.right.isDown || this.wasdKeys?.D.isDown) vx += 1;
+    if (this.cursors?.up.isDown || this.wasdKeys?.W.isDown) vy -= 1;
+    if (this.cursors?.down.isDown || this.wasdKeys?.S.isDown) vy += 1;
 
-      if (vx !== 0 || vy !== 0) {
-        this.tweens.killTweensOf(this.player);
-        this.isPlayerWalking = false;
-        const len = Math.hypot(vx, vy);
-        const normX = vx / len;
-        const normY = vy / len;
+    // Add dynamic floating joystick vector
+    if (this.dynamicMoveVector.x !== 0 || this.dynamicMoveVector.y !== 0) {
+      vx += this.dynamicMoveVector.x;
+      vy += this.dynamicMoveVector.y;
+    }
 
-        const moveDist = (this.playerSpeed * delta) / 1000;
-        this.player.x += normX * moveDist;
-        this.player.y += normY * moveDist;
+    if (this.player && (vx !== 0 || vy !== 0) && !this.isWon && !this.isTimeOver && !this.isOutOfMoves) {
+      this.tweens.killTweensOf(this.player);
+      this.isPlayerWalking = false;
+      const len = Math.hypot(vx, vy);
+      const normX = vx / len;
+      const normY = vy / len;
 
-        if (vx !== 0) {
-          this.player.setFlipX(vx < 0);
-        }
+      const tiltPower = (this.dynamicMoveVector.x !== 0 || this.dynamicMoveVector.y !== 0)
+        ? Math.min(1.2, Math.max(0.4, Math.hypot(this.dynamicMoveVector.x, this.dynamicMoveVector.y)))
+        : 1;
 
-        // Clamp inside board bounds
-        const minX = this.boardOffsetX + this.cellSize / 2;
-        const maxX = this.boardOffsetX + this.gridWidth * this.cellSize - this.cellSize / 2;
-        const minY = this.boardOffsetY + this.cellSize / 2;
-        const maxY = this.boardOffsetY + this.gridHeight * this.cellSize - this.cellSize / 2;
+      const moveDist = (this.playerSpeed * tiltPower * delta) / 1000;
+      this.player.x += normX * moveDist;
+      this.player.y += normY * moveDist;
 
-        this.player.x = Phaser.Math.Clamp(this.player.x, minX, maxX);
-        this.player.y = Phaser.Math.Clamp(this.player.y, minY, maxY);
+      if (vx !== 0) {
+        this.player.setFlipX(vx < 0);
+      }
 
-        // Select the cell under the player
-        const col = Math.floor((this.player.x - this.boardOffsetX) / this.cellSize);
-        const row = Math.floor((this.player.y - this.boardOffsetY) / this.cellSize);
+      // Clamp inside board bounds
+      const minX = this.boardOffsetX + this.cellSize / 2;
+      const maxX = this.boardOffsetX + this.gridWidth * this.cellSize - this.cellSize / 2;
+      const minY = this.boardOffsetY + this.cellSize / 2;
+      const maxY = this.boardOffsetY + this.gridHeight * this.cellSize - this.cellSize / 2;
 
-        if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
-          const cell = this.grid[row]?.[col];
-          if (cell && (this.selectedCell?.row !== row || this.selectedCell?.col !== col)) {
-            this.selectedCell = { row, col };
-            this.activeHoveredCell = { row, col };
-            this.renderGateInspector(cell, row, col);
-          }
+      this.player.x = Phaser.Math.Clamp(this.player.x, minX, maxX);
+      this.player.y = Phaser.Math.Clamp(this.player.y, minY, maxY);
+
+      // Select the cell under the player
+      const col = Math.floor((this.player.x - this.boardOffsetX) / this.cellSize);
+      const row = Math.floor((this.player.y - this.boardOffsetY) / this.cellSize);
+
+      if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
+        const cell = this.grid[row]?.[col];
+        if (cell && (this.selectedCell?.row !== row || this.selectedCell?.col !== col)) {
+          this.selectedCell = { row, col };
+          this.activeHoveredCell = { row, col };
+          this.renderGateInspector(cell, row, col);
         }
       }
     }
