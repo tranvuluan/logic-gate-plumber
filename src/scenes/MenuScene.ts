@@ -1,9 +1,11 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
+import { COLORS, FONTS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { ProgressManager } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
 import { audio } from '../utils/AudioManager';
+import { crazyGames } from '../utils/CrazyGamesManager';
+import { OrientationManager } from '../utils/OrientationManager';
 
 export class MenuScene extends Phaser.Scene {
   constructor() {
@@ -11,17 +13,21 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    crazyGames.gameplayStop();
     this.cameras.main.resetFX();
     this.cameras.main.setAlpha(1);
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const isPort = OrientationManager.isPortrait(this);
 
     // Draw PCB background
     const bg = this.add.graphics();
     const procGraphics = new ProceduralGraphics(this);
-    procGraphics.drawBackground(bg, GAME_WIDTH, GAME_HEIGHT);
+    procGraphics.drawBackground(bg, width, height);
 
-    // Top Header Action Buttons: Language & Sound
-    this.createLanguageToggle();
-    this.createAudioToggle();
+    // Top Header Action Buttons: Language, Sound, Orientation, Fullscreen
+    this.createHeaderControls(width, isPort);
 
     // Auto-resume audio & ambient BGM on first user touch/click
     audio.setChapterBGM(0);
@@ -31,49 +37,45 @@ export class MenuScene extends Phaser.Scene {
     });
 
     // Title group
-    const titleY = GAME_HEIGHT * 0.25;
+    const titleY = isPort ? 210 : height * 0.26;
 
     // Circuit icon
-    const icon = this.add.text(GAME_WIDTH / 2, titleY - 80, '🔌', {
-      fontSize: '64px',
+    const icon = this.add.text(width / 2, titleY - (isPort ? 70 : 70), '⚡', {
+      fontSize: isPort ? '50px' : '56px',
     });
     icon.setOrigin(0.5);
 
     // Game title
-    const title = this.add.text(GAME_WIDTH / 2, titleY, 'LOGIC GATE', {
-      fontSize: '48px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
+    const title = this.add.text(width / 2, titleY, 'LOGIC GATE PLUMBER', {
+      fontSize: isPort ? '36px' : '52px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
       fontStyle: 'bold',
+      stroke: '#002e1a',
+      strokeThickness: 4,
     });
     title.setOrigin(0.5);
 
-    const title2 = this.add.text(GAME_WIDTH / 2, titleY + 55, 'PLUMBER', {
-      fontSize: '48px',
-      fontFamily: 'monospace',
-      color: '#00aaff',
-      fontStyle: 'bold',
-    });
-    title2.setOrigin(0.5);
-
     // Subtitle
     const subtitle = this.add.text(
-      GAME_WIDTH / 2,
-      titleY + 110,
+      width / 2,
+      titleY + (isPort ? 46 : 54),
       i18n.t('menu_subtitle'),
       {
-        fontSize: '16px',
-        fontFamily: 'monospace',
-        color: '#4488aa',
+        fontSize: isPort ? '15px' : '18px',
+        fontFamily: FONTS.UI,
+        color: '#00f0ff',
+        fontStyle: 'bold',
+        letterSpacing: isPort ? 1 : 2,
       }
     );
     subtitle.setOrigin(0.5);
 
-    // Glow animation on titles
+    // Subtle glow animation on titles
     this.tweens.add({
-      targets: [title, title2],
-      alpha: { from: 0.8, to: 1 },
-      duration: 1500,
+      targets: [title, icon],
+      alpha: { from: 0.88, to: 1 },
+      duration: 1200,
       yoyo: true,
       repeat: -1,
     });
@@ -81,77 +83,227 @@ export class MenuScene extends Phaser.Scene {
     // Retrieve unlocked level
     const unlockedLevel = ProgressManager.getUnlockedLevel();
 
-    // Buttons
-    const buttonY = GAME_HEIGHT * 0.53;
-    const buttonSpacing = 82;
-
+    // Action Buttons
+    const buttonY = isPort ? 390 : height * 0.54;
+    const buttonSpacing = isPort ? 68 : 68;
+    const btnWidth = isPort ? 340 : 360;
     const continueLabel =
       unlockedLevel > 1
         ? i18n.t('btn_continue', { level: unlockedLevel })
         : i18n.t('btn_play_new');
 
+    // 1. Play / Continue
     this.createButton(
-      GAME_WIDTH / 2,
+      width / 2,
       buttonY,
+      btnWidth,
       continueLabel,
+      true,
       () => {
         this.cameras.main.resetFX();
         this.scene.start('GameScene', { levelId: unlockedLevel });
       }
     );
 
+    // 2. Select Level
     this.createButton(
-      GAME_WIDTH / 2,
+      width / 2,
       buttonY + buttonSpacing,
+      btnWidth,
       i18n.t('btn_select_level'),
+      false,
       () => {
         this.cameras.main.resetFX();
         this.scene.start('LevelSelectScene');
       }
     );
 
+    // 3. Tutorial / How to Play
     this.createButton(
-      GAME_WIDTH / 2,
+      width / 2,
       buttonY + buttonSpacing * 2,
+      btnWidth,
       i18n.t('btn_tutorial'),
+      false,
       () => {
         this.showTutorial();
       }
     );
 
-    // Footer - Made by Tran Vu Luan
+    // Cyberpunk Status Footer
+    const footerBg = this.add.graphics();
+    footerBg.fillStyle(0x0a1628, 0.85);
+    footerBg.fillRect(0, height - 44, width, 44);
+    footerBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.4);
+    footerBg.lineBetween(0, height - 44, width, height - 44);
+
+    const footerText = isPort
+      ? '⚡ 100 LEVELS • DIGITAL LOGIC GATES • PAR SCORING'
+      : '⚡ 100 UNIQUE LEVELS • REAL DIGITAL CIRCUITS • AND • OR • NOT • XOR • NAND • NOR • XNOR';
+
     const footer = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT - 60,
-      i18n.t('footer_text'),
+      width / 2,
+      height - 22,
+      footerText,
       {
-        fontSize: '13px',
-        fontFamily: 'monospace',
-        color: '#4e6d8a',
-        fontStyle: 'bold',
+        fontSize: isPort ? '12px' : '13px',
+        fontFamily: FONTS.TITLE,
+        color: '#6e93b8',
       }
     );
     footer.setOrigin(0.5);
 
-    // Decorative circuit elements
-    this.drawDecorativeCircuit();
+    // Decorative badges: side-by-side or below buttons
+    this.drawDecorativeSideBadges(width, height, isPort);
   }
 
-  private createLanguageToggle(): void {
+  private createHeaderControls(width: number, isPort: boolean): void {
+    const y = 36;
+    if (isPort) {
+      // Portrait compact header
+      this.createLanguageToggle(width - 55, y);
+      this.createAudioToggle(width - 130, y);
+      this.createFullscreenToggle(width - 205, y);
+    } else {
+      // Landscape header
+      this.createLanguageToggle(width - 65, y);
+      this.createAudioToggle(width - 140, y);
+      this.createFullscreenToggle(width - 215, y);
+    }
+  }
+
+  private drawDecorativeSideBadges(width: number, height: number, isPort: boolean): void {
+    if (isPort) {
+      // In portrait: place two badges side-by-side below the buttons
+      const badgeY = 740;
+      const bw = 260;
+      const bh = 190;
+
+      // Left chip badge (Gate Matrix)
+      const leftX = width / 2 - 145;
+      const leftG = this.add.graphics();
+      leftG.fillStyle(0x0c1b30, 0.85);
+      leftG.lineStyle(1.5, COLORS.CYBER_CYAN, 0.6);
+      leftG.fillRoundedRect(leftX - bw / 2, badgeY - bh / 2, bw, bh, 8);
+      leftG.strokeRoundedRect(leftX - bw / 2, badgeY - bh / 2, bw, bh, 8);
+
+      const leftTitle = this.add.text(leftX, badgeY - 65, 'GATE MATRIX', {
+        fontSize: '13px',
+        fontFamily: FONTS.TITLE,
+        color: '#00f0ff',
+        fontStyle: 'bold',
+      });
+      leftTitle.setOrigin(0.5);
+
+      const gatesList = ['AND  [&]', 'OR   [≥1]', 'NOT  [▷○]', 'XOR  [=1]'];
+      gatesList.forEach((g, i) => {
+        const gt = this.add.text(leftX, badgeY - 32 + i * 26, g, {
+          fontSize: '13px',
+          fontFamily: FONTS.MONO,
+          color: '#90caf9',
+        });
+        gt.setOrigin(0.5);
+      });
+
+      // Right chip badge (System Specs)
+      const rightX = width / 2 + 145;
+      const rightG = this.add.graphics();
+      rightG.fillStyle(0x0c1b30, 0.85);
+      rightG.lineStyle(1.5, COLORS.CYBER_YELLOW, 0.6);
+      rightG.fillRoundedRect(rightX - bw / 2, badgeY - bh / 2, bw, bh, 8);
+      rightG.strokeRoundedRect(rightX - bw / 2, badgeY - bh / 2, bw, bh, 8);
+
+      const rightTitle = this.add.text(rightX, badgeY - 65, 'SYSTEM SPECS', {
+        fontSize: '13px',
+        fontFamily: FONTS.TITLE,
+        color: '#ffd000',
+        fontStyle: 'bold',
+      });
+      rightTitle.setOrigin(0.5);
+
+      const specs = ['5 CHAPTERS', '100 PUZZLES', 'ENDLESS MODE', 'PAR SCORING'];
+      specs.forEach((s, i) => {
+        const st = this.add.text(rightX, badgeY - 32 + i * 26, s, {
+          fontSize: '13px',
+          fontFamily: FONTS.MONO,
+          color: '#ffecb3',
+        });
+        st.setOrigin(0.5);
+      });
+    } else {
+      // Landscape badges on extreme left and right
+      const leftX = 140;
+      const leftY = height * 0.52;
+
+      const leftG = this.add.graphics();
+      leftG.fillStyle(0x0c1b30, 0.85);
+      leftG.lineStyle(1.5, COLORS.CYBER_CYAN, 0.6);
+      leftG.fillRoundedRect(leftX - 80, leftY - 110, 160, 220, 10);
+      leftG.strokeRoundedRect(leftX - 80, leftY - 110, 160, 220, 10);
+
+      const leftTitle = this.add.text(leftX, leftY - 80, 'GATE MATRIX', {
+        fontSize: '14px',
+        fontFamily: FONTS.TITLE,
+        color: '#00f0ff',
+        fontStyle: 'bold',
+      });
+      leftTitle.setOrigin(0.5);
+
+      const gatesList = ['AND  [&]', 'OR   [≥1]', 'NOT  [▷○]', 'XOR  [=1]'];
+      gatesList.forEach((g, i) => {
+        const gt = this.add.text(leftX, leftY - 40 + i * 36, g, {
+          fontSize: '15px',
+          fontFamily: FONTS.MONO,
+          color: '#90caf9',
+        });
+        gt.setOrigin(0.5);
+      });
+
+      // Right chip badge
+      const rightX = width - 140;
+      const rightY = height * 0.52;
+
+      const rightG = this.add.graphics();
+      rightG.fillStyle(0x0c1b30, 0.85);
+      rightG.lineStyle(1.5, COLORS.CYBER_YELLOW, 0.6);
+      rightG.fillRoundedRect(rightX - 80, rightY - 110, 160, 220, 10);
+      rightG.strokeRoundedRect(rightX - 80, rightY - 110, 160, 220, 10);
+
+      const rightTitle = this.add.text(rightX, rightY - 80, 'SYSTEM SPECS', {
+        fontSize: '14px',
+        fontFamily: FONTS.TITLE,
+        color: '#ffd000',
+        fontStyle: 'bold',
+      });
+      rightTitle.setOrigin(0.5);
+
+      const specs = ['5 CHAPTERS', '100 PUZZLES', 'ENDLESS MODE', 'PAR SCORING'];
+      specs.forEach((s, i) => {
+        const st = this.add.text(rightX, rightY - 40 + i * 36, s, {
+          fontSize: '14px',
+          fontFamily: FONTS.MONO,
+          color: '#ffecb3',
+        });
+        st.setOrigin(0.5);
+      });
+    }
+  }
+
+  private createLanguageToggle(x: number, y: number): void {
     const lang = i18n.getLanguage();
-    const btnContainer = this.add.container(GAME_WIDTH - 65, 46);
+    const btnContainer = this.add.container(x, y);
     btnContainer.setDepth(150);
 
     const btnBg = this.add.graphics();
     btnBg.fillStyle(0x0e243c, 0.95);
     btnBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.85);
-    btnBg.fillRoundedRect(-46, -18, 92, 36, 18);
-    btnBg.strokeRoundedRect(-46, -18, 92, 36, 18);
+    btnBg.fillRoundedRect(-40, -17, 80, 34, 6);
+    btnBg.strokeRoundedRect(-40, -17, 80, 34, 6);
 
     const flagText = lang === 'vi' ? '🇻🇳 VI' : '🇬🇧 EN';
     const label = this.add.text(0, 0, flagText, {
       fontSize: '13px',
-      fontFamily: 'monospace',
+      fontFamily: FONTS.UI,
       color: '#00f0ff',
       fontStyle: 'bold',
     });
@@ -159,7 +311,7 @@ export class MenuScene extends Phaser.Scene {
 
     btnContainer.add([btnBg, label]);
 
-    const zone = this.add.zone(0, 0, 92, 36);
+    const zone = this.add.zone(0, 0, 80, 34);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
       audio.playButtonClick();
@@ -178,25 +330,25 @@ export class MenuScene extends Phaser.Scene {
     btnContainer.add(zone);
   }
 
-  private createAudioToggle(): void {
+  private createAudioToggle(x: number, y: number): void {
     const isMuted = audio.isMuted();
-    const btnContainer = this.add.container(GAME_WIDTH - 138, 46);
+    const btnContainer = this.add.container(x, y);
     btnContainer.setDepth(150);
 
     const btnBg = this.add.graphics();
     btnBg.fillStyle(0x0e243c, 0.95);
     btnBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.85);
-    btnBg.fillRoundedRect(-22, -18, 44, 36, 18);
-    btnBg.strokeRoundedRect(-22, -18, 44, 36, 18);
+    btnBg.fillRoundedRect(-20, -17, 40, 34, 6);
+    btnBg.strokeRoundedRect(-20, -17, 40, 34, 6);
 
     const icon = this.add.text(0, 0, isMuted ? '🔇' : '🔊', {
-      fontSize: '16px',
+      fontSize: '15px',
     });
     icon.setOrigin(0.5);
 
     btnContainer.add([btnBg, icon]);
 
-    const zone = this.add.zone(0, 0, 44, 36);
+    const zone = this.add.zone(0, 0, 40, 34);
     zone.setInteractive({ useHandCursor: true });
     zone.on('pointerdown', () => {
       const nowMuted = audio.toggleMute();
@@ -216,50 +368,90 @@ export class MenuScene extends Phaser.Scene {
     btnContainer.add(zone);
   }
 
-  private createButton(x: number, y: number, text: string, callback: () => void): void {
-    const btnWidth = 320;
-    const btnHeight = 60;
+  private createFullscreenToggle(x: number, y: number): void {
+    const btnContainer = this.add.container(x, y);
+    btnContainer.setDepth(150);
+
+    const btnBg = this.add.graphics();
+    btnBg.fillStyle(0x0e243c, 0.95);
+    btnBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.85);
+    btnBg.fillRoundedRect(-20, -17, 40, 34, 6);
+    btnBg.strokeRoundedRect(-20, -17, 40, 34, 6);
+
+    const icon = this.add.text(0, 0, '⛶', {
+      fontSize: '17px',
+      color: '#00f0ff',
+    });
+    icon.setOrigin(0.5);
+
+    btnContainer.add([btnBg, icon]);
+
+    const zone = this.add.zone(0, 0, 40, 34);
+    zone.setInteractive({ useHandCursor: true });
+    zone.on('pointerdown', () => {
+      audio.playButtonClick();
+      if (this.scale.isFullscreen) {
+        this.scale.stopFullscreen();
+      } else {
+        this.scale.startFullscreen();
+      }
+    });
+    btnContainer.add(zone);
+  }
+
+  private createButton(
+    x: number,
+    y: number,
+    btnWidth: number,
+    text: string,
+    isPrimary: boolean,
+    callback: () => void
+  ): void {
+    const btnHeight = 52;
 
     const bg = this.add.graphics();
-    bg.fillStyle(COLORS.UI_BUTTON, 1);
-    bg.lineStyle(2, COLORS.UI_PRIMARY, 0.6);
-    bg.fillRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 12);
-    bg.strokeRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 12);
+    const strokeCol = isPrimary ? COLORS.SIGNAL_ON : COLORS.UI_PRIMARY;
+    bg.fillStyle(isPrimary ? 0x0c3325 : COLORS.UI_BUTTON, 1);
+    bg.lineStyle(2, strokeCol, 0.9);
+    bg.fillRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 10);
+    bg.strokeRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 10);
 
     const label = this.add.text(x, y, text, {
-      fontSize: '22px',
-      fontFamily: 'monospace',
-      color: '#ffffff',
+      fontSize: '19px',
+      fontFamily: FONTS.TITLE,
+      color: isPrimary ? '#00ff9d' : '#ffffff',
+      fontStyle: 'bold',
     });
     label.setOrigin(0.5);
 
-    // Interactive zone
     const hitZone = this.add.zone(x, y, btnWidth, btnHeight);
     hitZone.setInteractive({ useHandCursor: true });
 
     hitZone.on('pointerover', () => {
       bg.clear();
-      bg.fillStyle(COLORS.UI_BUTTON_HOVER, 1);
-      bg.lineStyle(2, COLORS.UI_PRIMARY, 1);
-      bg.fillRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 12);
-      bg.strokeRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 12);
+      bg.fillStyle(isPrimary ? 0x114d36 : COLORS.UI_BUTTON_HOVER, 1);
+      bg.lineStyle(2.5, isPrimary ? 0x00ffcc : 0x00ffff, 1);
+      bg.fillRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 10);
+      bg.strokeRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 10);
+      label.setColor(isPrimary ? '#ffffff' : '#00ffff');
     });
 
     hitZone.on('pointerout', () => {
       bg.clear();
-      bg.fillStyle(COLORS.UI_BUTTON, 1);
-      bg.lineStyle(2, COLORS.UI_PRIMARY, 0.6);
-      bg.fillRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 12);
-      bg.strokeRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 12);
+      bg.fillStyle(isPrimary ? 0x0c3325 : COLORS.UI_BUTTON, 1);
+      bg.lineStyle(2, strokeCol, 0.9);
+      bg.fillRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 10);
+      bg.strokeRoundedRect(x - btnWidth / 2, y - btnHeight / 2, btnWidth, btnHeight, 10);
+      label.setColor(isPrimary ? '#00ff9d' : '#ffffff');
     });
 
     hitZone.on('pointerdown', () => {
       audio.playButtonClick();
       this.tweens.add({
-        targets: [bg, label],
+        targets: [label],
         scaleX: 0.95,
         scaleY: 0.95,
-        duration: 100,
+        duration: 70,
         yoyo: true,
         onComplete: callback,
       });
@@ -267,104 +459,67 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private showTutorial(): void {
-    // Dark overlay
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    const modalGroup = this.add.container(0, 0);
+    modalGroup.setDepth(200);
+
     const overlay = this.add.graphics();
-    overlay.fillStyle(0x000000, 0.8);
-    overlay.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    overlay.setDepth(100);
+    overlay.fillStyle(0x000000, 0.85);
+    overlay.fillRect(0, 0, width, height);
+    overlay.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, width, height),
+      Phaser.Geom.Rectangle.Contains
+    );
 
-    // Tutorial panel
+    const pw = Math.min(800, width - 40);
+    const ph = Math.min(540, height - 60);
+    const px = (width - pw) / 2;
+    const py = (height - ph) / 2;
+
     const panel = this.add.graphics();
-    panel.fillStyle(COLORS.GATE_BODY, 0.95);
-    panel.lineStyle(2, COLORS.UI_PRIMARY, 0.8);
-    const pw = 600;
-    const ph = 700;
-    const px = (GAME_WIDTH - pw) / 2;
-    const py = (GAME_HEIGHT - ph) / 2;
-    panel.fillRoundedRect(px, py, pw, ph, 16);
-    panel.strokeRoundedRect(px, py, pw, ph, 16);
-    panel.setDepth(101);
+    panel.fillStyle(COLORS.UI_PANEL, 0.98);
+    panel.lineStyle(2, COLORS.CYBER_CYAN, 0.95);
+    panel.fillRoundedRect(px, py, pw, ph, 14);
+    panel.strokeRoundedRect(px, py, pw, ph, 14);
 
-    const tutorialText = this.add.text(
-      GAME_WIDTH / 2,
-      py + 40,
+    const title = this.add.text(
+      width / 2,
+      py + 32,
       i18n.t('tutorial_title'),
       {
-        fontSize: '24px',
-        fontFamily: 'monospace',
-        color: '#00ff88',
+        fontSize: '22px',
+        fontFamily: FONTS.TITLE,
+        color: '#00ff9d',
         fontStyle: 'bold',
       }
     );
-    tutorialText.setOrigin(0.5, 0);
-    tutorialText.setDepth(102);
+    title.setOrigin(0.5);
 
-    const content = this.add.text(
-      GAME_WIDTH / 2,
-      py + 85,
-      i18n.t('tutorial_body'),
-      {
-        fontSize: '14px',
-        fontFamily: 'monospace',
-        color: '#ccddee',
-        lineSpacing: 4,
-        align: 'left',
-        wordWrap: { width: pw - 50 },
-      }
-    );
-    content.setOrigin(0.5, 0);
-    content.setDepth(102);
+    const body = this.add.text(px + 30, py + 72, i18n.t('tutorial_body'), {
+      fontSize: '15px',
+      fontFamily: FONTS.UI,
+      color: '#d0e5ff',
+      lineSpacing: 7,
+      wordWrap: { width: pw - 60 },
+    });
 
     // Close button
-    const closeBtn = this.add.text(
-      GAME_WIDTH / 2,
-      py + ph - 45,
-      i18n.t('btn_close'),
-      {
-        fontSize: '18px',
-        fontFamily: 'monospace',
-        color: '#00f0ff',
-        fontStyle: 'bold',
-      }
-    );
+    const closeBtnY = py + ph - 38;
+    const closeBtn = this.add.text(width / 2, closeBtnY, i18n.t('btn_close'), {
+      fontSize: '18px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffd000',
+      fontStyle: 'bold',
+    });
     closeBtn.setOrigin(0.5);
-    closeBtn.setDepth(102);
     closeBtn.setInteractive({ useHandCursor: true });
     closeBtn.on('pointerdown', () => {
       audio.playButtonClick();
-      overlay.destroy();
-      panel.destroy();
-      tutorialText.destroy();
-      content.destroy();
-      closeBtn.destroy();
+      modalGroup.destroy();
     });
-  }
 
-  private drawDecorativeCircuit(): void {
-    const g = this.add.graphics();
-    g.lineStyle(1, COLORS.PCB_TRACE, 0.15);
-
-    // Random circuit traces
-    const traces = [
-      [50, 800, 200, 800, 200, 900, 350, 900],
-      [GAME_WIDTH - 50, 750, GAME_WIDTH - 200, 750, GAME_WIDTH - 200, 850],
-      [100, 1050, 250, 1050, 250, 1100, 400, 1100, 400, 1150],
-      [GAME_WIDTH - 100, 1000, GAME_WIDTH - 300, 1000, GAME_WIDTH - 300, 1100],
-    ];
-
-    for (const trace of traces) {
-      g.beginPath();
-      g.moveTo(trace[0], trace[1]);
-      for (let i = 2; i < trace.length; i += 2) {
-        g.lineTo(trace[i], trace[i + 1]);
-      }
-      g.strokePath();
-    }
-
-    // Small component-like rectangles
-    g.fillStyle(COLORS.GATE_BODY, 0.2);
-    g.fillRect(60, 900, 30, 15);
-    g.fillRect(GAME_WIDTH - 180, 850, 30, 15);
-    g.fillRect(280, 1100, 25, 12);
+    modalGroup.add([overlay, panel, title, body, closeBtn]);
   }
 }

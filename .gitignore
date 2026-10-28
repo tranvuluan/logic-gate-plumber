@@ -3,6 +3,10 @@ node_modules/
 .pnp
 .pnp.js
 
+# Binary releases (Keep web builds minimal and clean)
+*.apk
+*.aab
+
 # Local tools & SDKs (OpenJDK, Android SDK, Cloudflared)
 tools/
 *.log

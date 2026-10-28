@@ -1,81 +1,124 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
+import { COLORS, FONTS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
+import { crazyGames } from '../utils/CrazyGamesManager';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
     super({ key: 'BootScene' });
   }
 
-  create(): void {
-    // Generate all procedural textures
+  async create(): Promise<void> {
+    // Notify CrazyGames loading start
+    crazyGames.loadingStart();
+
+    // Generate all procedural circuit textures
     const procGraphics = new ProceduralGraphics(this);
     procGraphics.generateTextures();
 
-    // Show loading animation
-    const bg = this.add.graphics();
-    bg.fillStyle(COLORS.BG_DARK, 1);
-    bg.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    // Dynamic dimensions for portrait & landscape
+    const width = this.scale.width;
+    const height = this.scale.height;
 
-    // Title
-    const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 100, '⚡', {
-      fontSize: '80px',
+    // Background
+    const bg = this.add.graphics();
+    procGraphics.drawBackground(bg, width, height);
+
+    const centerY = height / 2;
+
+    // Glowing Cyber Logo
+    const icon = this.add.text(width / 2, centerY - 110, '⚡', {
+      fontSize: '64px',
     });
-    title.setOrigin(0.5);
+    icon.setOrigin(0.5);
 
     const titleText = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      'LOGIC GATE\nPLUMBER',
+      width / 2,
+      centerY - 30,
+      'LOGIC GATE PLUMBER',
       {
-        fontSize: '42px',
-        fontFamily: 'monospace',
-        color: '#00ff88',
-        align: 'center',
-        lineSpacing: 8,
+        fontSize: width < 800 ? '34px' : '44px',
+        fontFamily: FONTS.TITLE,
+        color: '#00ff9d',
+        fontStyle: 'bold',
+        stroke: '#003822',
+        strokeThickness: 3,
       }
     );
     titleText.setOrigin(0.5);
 
     const subtitle = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2 + 80,
-      'Digital Circuit Puzzle',
+      width / 2,
+      centerY + 24,
+      'HIGH-TECH DIGITAL CIRCUIT PUZZLE',
       {
-        fontSize: '18px',
-        fontFamily: 'monospace',
-        color: '#4488aa',
+        fontSize: width < 800 ? '15px' : '18px',
+        fontFamily: FONTS.UI,
+        color: '#00f0ff',
+        letterSpacing: 2,
       }
     );
     subtitle.setOrigin(0.5);
 
-    // Loading dots animation
-    const loadingText = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2 + 160,
-      'Loading...',
+    // Cyberpunk loading bar container
+    const barWidth = Math.min(360, width - 80);
+    const barHeight = 8;
+    const barX = (width - barWidth) / 2;
+    const barY = centerY + 80;
+
+    const barBg = this.add.graphics();
+    barBg.fillStyle(0x0e1f36, 1);
+    barBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.7);
+    barBg.fillRoundedRect(barX, barY, barWidth, barHeight, 4);
+    barBg.strokeRoundedRect(barX, barY, barWidth, barHeight, 4);
+
+    const barFill = this.add.graphics();
+
+    const loadingLabel = this.add.text(
+      width / 2,
+      barY + 30,
+      'INITIALIZING LOGIC ENGINE...',
       {
-        fontSize: '16px',
-        fontFamily: 'monospace',
-        color: '#336688',
+        fontSize: '14px',
+        fontFamily: FONTS.MONO,
+        color: '#7ba0c5',
       }
     );
-    loadingText.setOrigin(0.5);
+    loadingLabel.setOrigin(0.5);
 
-    // Pulse animation on title
+    // Pulse animation on logo
     this.tweens.add({
-      targets: title,
-      scale: { from: 0.8, to: 1.2 },
+      targets: icon,
+      scale: { from: 0.85, to: 1.15 },
       alpha: { from: 0.7, to: 1 },
-      duration: 800,
+      duration: 600,
       yoyo: true,
-      repeat: 1,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
     });
 
-    // Transition to menu after delay
-    this.time.delayedCall(1600, () => {
-      this.cameras.main.resetFX();
-      this.scene.start('MenuScene');
+    // Animate progress bar fill
+    const progressObj = { value: 0 };
+    this.tweens.add({
+      targets: progressObj,
+      value: 1,
+      duration: 800,
+      ease: 'Cubic.easeOut',
+      onUpdate: () => {
+        barFill.clear();
+        barFill.fillStyle(COLORS.SIGNAL_ON, 1);
+        barFill.fillRoundedRect(barX + 1, barY + 1, (barWidth - 2) * progressObj.value, barHeight - 2, 3);
+      },
+      onComplete: async () => {
+        // Initialize CrazyGames SDK v3
+        await crazyGames.init();
+        crazyGames.loadingStop();
+
+        this.cameras.main.fade(300, 6, 12, 24);
+        this.time.delayedCall(320, () => {
+          this.scene.start('MenuScene');
+        });
+      },
     });
   }
 }

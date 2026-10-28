@@ -1,24 +1,22 @@
 import Phaser from 'phaser';
 import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
   CELL_SIZE,
   COLORS,
+  FONTS,
   GateType,
   Direction,
   GateDefinition,
   ANIM,
-  TOUCH,
   TestCase,
 } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
 import { SignalEngine, CellState, ShortCircuitEdge } from '../logic/SignalEngine';
-import { TouchControls } from '../utils/TouchControls';
-import { VirtualJoystick } from '../utils/VirtualJoystick';
 import { getLevels, generateEndlessLevel } from '../logic/LevelGenerator';
-import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
+import { ProgressManager } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
 import { audio } from '../utils/AudioManager';
+import { crazyGames } from '../utils/CrazyGamesManager';
+import { OrientationManager } from '../utils/OrientationManager';
 
 interface CellSprite {
   container: Phaser.GameObjects.Container;
@@ -41,7 +39,6 @@ export class GameScene extends Phaser.Scene {
   private cellSize: number = CELL_SIZE;
   private cellSprites: (CellSprite | null)[][] = [];
   private signalEngine!: SignalEngine;
-  private touchControls!: TouchControls;
   private boardOffsetX: number = 0;
   private boardOffsetY: number = 0;
   private sources: { row: number; col: number; value: number }[] = [];
@@ -51,9 +48,8 @@ export class GameScene extends Phaser.Scene {
   private isAnimating: boolean = false;
   private isWon: boolean = false;
   private isTimeOver: boolean = false;
+  private isOutOfMoves: boolean = false;
   private cheatSheetGroup: Phaser.GameObjects.Container | null = null;
-  private modalGroup: Phaser.GameObjects.Container | null = null;
-  private headerHeight: number = 110;
   private availableHints: number = 3;
 
   // Move Limit & Par Moves (3-Star Rating)
@@ -61,12 +57,12 @@ export class GameScene extends Phaser.Scene {
   private parMoves: number = 5;
   private twoStarMoves: number = 7;
   private maxMoves: number = 12;
-  private isOutOfMoves: boolean = false;
   private movesText!: Phaser.GameObjects.Text;
+  private starsPreviewText!: Phaser.GameObjects.Text;
 
   // Level Countdown Timer
-  private totalTimeLimit: number = 60;
-  private timeRemaining: number = 60;
+  private totalTimeLimit: number = 90;
+  private timeRemaining: number = 90;
   private timerText!: Phaser.GameObjects.Text;
   private timerBarGraphics!: Phaser.GameObjects.Graphics;
 
@@ -76,33 +72,28 @@ export class GameScene extends Phaser.Scene {
 
   // Short-circuit warning graphics
   private shortCircuitGraphics!: Phaser.GameObjects.Graphics;
-  private shortCircuitText?: Phaser.GameObjects.Text;
 
-  // Plumber character and controls
-  private player!: Phaser.GameObjects.Sprite;
-  private playerSpeed: number = 260;
-  private virtualJoystick!: VirtualJoystick;
-  private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
-  private keys?: { [key: string]: Phaser.Input.Keyboard.Key };
-  private activeTargetCell: { row: number; col: number } | null = null;
+  // Target gate hover / selection highlight
   private targetCellHighlight!: Phaser.GameObjects.Graphics;
-  private leftActionButtonContainer!: Phaser.GameObjects.Container;
-  private rightActionButtonContainer!: Phaser.GameObjects.Container;
+  private activeHoveredCell: { row: number; col: number } | null = null;
+  private selectedCell: { row: number; col: number } | null = null;
+
+  // Left & Right Panels
   private hintBtnText!: Phaser.GameObjects.Text;
-
-  // Zoom & Pan state
-  private boardScale: number = 1.0;
-  private initialPinchDistance: number = 0;
-  private initialScale: number = 1.0;
-  private isPanDragging: boolean = false;
-  private panStartPos: { x: number; y: number } = { x: 0, y: 0 };
-  private containerStartPos: { x: number; y: number } = { x: 0, y: 0 };
-
-  // In-Game Next Level HUD & Header buttons
-  private ledStatusText?: Phaser.GameObjects.Text;
+  private ledStatusText!: Phaser.GameObjects.Text;
   private clockStatusText?: Phaser.GameObjects.Text;
-  private nextLevelHudContainer: Phaser.GameObjects.Container | null = null;
-  private headerNextBtn: Phaser.GameObjects.Container | null = null;
+
+  // Gate Inspector & Truth Table Container (Right side)
+  private inspectorContainer!: Phaser.GameObjects.Container;
+
+  // Plumber character and keyboard movement
+  private player!: Phaser.GameObjects.Sprite;
+  private playerSpeed: number = 320;
+  private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
+  private wasdKeys?: { [key: string]: Phaser.Input.Keyboard.Key };
+
+  // Level 1 tutorial pointer
+  private tutorialPointer?: Phaser.GameObjects.Container;
 
   constructor() {
     super({ key: 'GameScene' });
@@ -118,18 +109,19 @@ export class GameScene extends Phaser.Scene {
     this.pulseOffset = 0;
     this.availableHints = 3;
     this.movesCount = 0;
-    this.boardScale = 1.0;
-    this.nextLevelHudContainer = null;
-    this.headerNextBtn = null;
-    this.modalGroup = null;
     this.cheatSheetGroup = null;
+    this.activeHoveredCell = null;
+    this.selectedCell = null;
   }
 
   create(): void {
+    // Notify CrazyGames gameplay start
+    crazyGames.gameplayStart();
+
     this.cameras.main.resetFX();
     this.cameras.main.setAlpha(1);
 
-    // 1. Load level data (from predefined 100 levels or procedural endless)
+    // 1. Load level data
     let level;
     if (this.isEndless) {
       level = generateEndlessLevel(this.levelId);
@@ -142,7 +134,9 @@ export class GameScene extends Phaser.Scene {
     this.levelName = i18n.translateLevelName(level.id, level.name);
     this.levelSubtitle = i18n.translateLevelSubtitle(level.id, level.subtitle);
     this.tutorialText = i18n.translateTutorialText(level.id, level.tutorialText);
-    this.totalTimeLimit = level.timeLimit || 60;
+
+    // Give new players plenty of time (120s on early levels) to prevent frustration
+    this.totalTimeLimit = this.levelId <= 5 ? 150 : (level.timeLimit || 90);
     this.timeRemaining = this.totalTimeLimit;
 
     this.gridWidth = level.gridWidth;
@@ -151,11 +145,13 @@ export class GameScene extends Phaser.Scene {
     this.leds = level.leds;
     this.testCases = level.testCases;
 
-    // Calculate dynamic cell size so large boards (8x8 to 10x10) fit screens comfortably
-    const maxDim = Math.max(this.gridWidth, this.gridHeight);
-    this.cellSize = maxDim > 6 ? Math.min(CELL_SIZE, Math.floor(660 / maxDim)) : CELL_SIZE;
+    // Calculate dynamic cell size for current orientation
+    const isPort = OrientationManager.isPortrait(this);
+    const maxAreaH = isPort ? 600 : 550;
+    const maxAreaW = isPort ? 680 : 660;
+    this.cellSize = Math.min(104, Math.floor(Math.min(maxAreaW / this.gridWidth, maxAreaH / this.gridHeight)));
 
-    // Switch to Chapter-Specific Cyberpunk Music Theme
+    // Chapter BGM
     let chapterId = 1;
     if (this.isEndless || this.levelId > 100) {
       chapterId = 6;
@@ -184,38 +180,57 @@ export class GameScene extends Phaser.Scene {
       )
     );
 
-    // Accurate Par moves & tight tactical move limit
+    // Par moves and limits
     this.parMoves = level.parMoves || this.calculateExactMinMoves(this.grid);
-    this.twoStarMoves = this.parMoves + 1; // 2 Stars: strictly within 1 move of optimal par!
-    this.maxMoves = level.maxMoves || (this.parMoves + (this.parMoves <= 3 ? 2 : this.parMoves <= 7 ? 3 : 4));
+    this.twoStarMoves = this.parMoves + 1;
+    this.maxMoves = level.maxMoves || (this.parMoves + (this.parMoves <= 3 ? 3 : this.parMoves <= 7 ? 4 : 5));
 
-    // Disable browser right-click context menu so right clicking rotates counter-clockwise
+    // Disable browser right-click context menu for smooth PC rotation
     this.input.mouse?.disableContextMenu();
 
-    // Initialize BFS signal engine
+    // Initialize SignalEngine
     this.signalEngine = new SignalEngine(this.grid, this.gridHeight, this.gridWidth);
+
+    const width = this.scale.width;
+    const height = this.scale.height;
 
     // Draw Cyberpunk Background
     const bg = this.add.graphics();
     const procGraphics = new ProceduralGraphics(this);
-    procGraphics.drawBackground(bg, GAME_WIDTH, GAME_HEIGHT);
+    procGraphics.drawBackground(bg, width, height);
 
-    // Draw Header with Timer & Moves
+    // Draw Top Header
     this.drawHeader();
 
-    // Draw Tutorial Banner
-    this.drawTutorialBanner();
+    // Draw Panels based on orientation
+    if (isPort) {
+      this.drawPortraitUI();
+    } else {
+      this.drawLeftPanel();
+      this.drawRightInspectorPanel();
+    }
 
     // Calculate Board Layout
     const boardWidth = this.gridWidth * this.cellSize;
     const boardHeight = this.gridHeight * this.cellSize;
-    this.boardOffsetX = (GAME_WIDTH - boardWidth) / 2;
-    this.boardOffsetY = 210 + (GAME_HEIGHT - 210 - 270 - boardHeight) / 2;
+    if (isPort) {
+      const centerAreaY = 142;
+      const centerAreaH = 638;
+      this.boardOffsetX = (width - boardWidth) / 2;
+      this.boardOffsetY = centerAreaY + (centerAreaH - boardHeight) / 2;
+    } else {
+      const centerAreaX = 290;
+      const centerAreaW = 690;
+      const centerAreaY = 72;
+      const centerAreaH = 620;
+      this.boardOffsetX = centerAreaX + (centerAreaW - boardWidth) / 2;
+      this.boardOffsetY = centerAreaY + (centerAreaH - boardHeight) / 2;
+    }
 
-    // Board container (Supports Pinch-to-Zoom & Pan)
+    // Board container
     this.boardContainer = this.add.container(0, 0);
 
-    // Board background frame
+    // Board background grid frame
     const gridBg = this.add.graphics();
     procGraphics.drawGridBackground(
       gridBg,
@@ -240,7 +255,7 @@ export class GameScene extends Phaser.Scene {
     this.shortCircuitGraphics.setDepth(38);
     this.boardContainer.add(this.shortCircuitGraphics);
 
-    // Target gate reticle
+    // Target highlight
     this.targetCellHighlight = this.add.graphics();
     this.targetCellHighlight.setDepth(45);
     this.boardContainer.add(this.targetCellHighlight);
@@ -248,47 +263,45 @@ export class GameScene extends Phaser.Scene {
     // Create Plumber character
     this.createPlayer();
 
-    // Setup input schemes
-    this.setupTouchControls();
-    this.setupVirtualControls();
+    // Keyboard controls
     this.setupKeyboardControls();
-    this.setupZoomAndPanControls();
-
-    // Bottom UI Bar (created before signal propagation)
-    this.drawBottomUI();
-
-    // Floating Reset Zoom Button (for large grids)
-    this.createResetZoomButton();
 
     // Initial signal propagation
     this.propagateSignals();
+
+    // Onboarding finger prompt for Level 1
+    if (this.levelId === 1) {
+      this.showLevel1TutorialPrompt();
+    }
   }
 
   private drawHeader(): void {
+    const width = this.scale.width;
+    const isPort = OrientationManager.isPortrait(this);
+    const headerHeight = 62;
     const headerBg = this.add.graphics();
-    headerBg.fillStyle(COLORS.BG_DARK, 0.94);
-    headerBg.fillRect(0, 0, GAME_WIDTH, this.headerHeight);
+    headerBg.fillStyle(COLORS.BG_DARK, 0.95);
+    headerBg.fillRect(0, 0, width, headerHeight);
     headerBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.4);
-    headerBg.beginPath();
-    headerBg.moveTo(0, this.headerHeight);
-    headerBg.lineTo(GAME_WIDTH, this.headerHeight);
-    headerBg.strokePath();
-    headerBg.setDepth(999);
+    headerBg.lineBetween(0, headerHeight, width, headerHeight);
+    headerBg.setDepth(100);
 
     // Timer Bar at top edge of screen
     this.timerBarGraphics = this.add.graphics();
-    this.timerBarGraphics.setDepth(1001);
+    this.timerBarGraphics.setDepth(102);
     this.updateTimerBar();
 
-    // Back to Level Select
-    const backBtnContainer = this.add.container(78, 38);
-    backBtnContainer.setDepth(1002);
-    const backBg = this.add.rectangle(0, 0, 116, 36, 0x112740, 0.92);
-    backBg.setStrokeStyle(1.5, 0x00f0ff, 0.8);
+    // Back to Level Select button
+    const backBtnX = isPort ? 50 : 80;
+    const backBtnW = isPort ? 80 : 120;
+    const backBtnContainer = this.add.container(backBtnX, 31);
+    backBtnContainer.setDepth(105);
+    const backBg = this.add.rectangle(0, 0, backBtnW, 32, 0x0e243c, 0.95);
+    backBg.setStrokeStyle(1.5, 0x00f0ff, 0.85);
     backBg.setInteractive({ useHandCursor: true });
-    const backBtnText = this.add.text(0, 0, i18n.t('btn_back_levels'), {
+    const backBtnText = this.add.text(0, 0, isPort ? '◀ MENU' : i18n.t('btn_back_levels'), {
       fontSize: '13px',
-      fontFamily: 'monospace',
+      fontFamily: FONTS.TITLE,
       color: '#00f0ff',
       fontStyle: 'bold',
     });
@@ -301,172 +314,821 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Level Title
-    const title = this.add.text(GAME_WIDTH / 2, 18, this.levelName, {
-      fontSize: '20px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
+    const title = this.add.text(width / 2, 14, this.levelName, {
+      fontSize: isPort ? '16px' : '20px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
       fontStyle: 'bold',
     });
     title.setOrigin(0.5, 0);
-    title.setDepth(1000);
-
-    // Moves & Par Rating HUD
-    this.movesText = this.add.text(
-      GAME_WIDTH / 2,
-      44,
-      '',
-      {
-        fontSize: '12px',
-        fontFamily: 'monospace',
-        color: '#ffd000',
-        fontStyle: 'bold',
-      }
-    );
-    this.movesText.setOrigin(0.5, 0);
-    this.movesText.setDepth(1000);
-    this.updateMovesDisplay();
+    title.setDepth(105);
 
     // Subtitle
-    const subtitle = this.add.text(GAME_WIDTH / 2, 66, this.levelSubtitle, {
-      fontSize: '11px',
-      fontFamily: 'monospace',
-      color: '#88b0d0',
+    const subtitle = this.add.text(width / 2, 38, this.levelSubtitle, {
+      fontSize: isPort ? '11px' : '13px',
+      fontFamily: FONTS.UI,
+      color: '#82a5c7',
+      fontStyle: 'bold',
     });
     subtitle.setOrigin(0.5, 0);
-    subtitle.setDepth(1000);
+    subtitle.setDepth(105);
 
-    // Header Next Level Button (shown when level is solved)
-    this.headerNextBtn = this.add.container(GAME_WIDTH / 2, 92);
-    this.headerNextBtn.setDepth(1002);
-    const nextHdrBg = this.add.rectangle(0, 0, 220, 28, 0x00ff88, 1);
-    nextHdrBg.setStrokeStyle(1.5, 0xffffff, 1);
-    nextHdrBg.setInteractive({ useHandCursor: true });
-    const nextHdrText = this.add.text(
-      0,
-      0,
-      this.isEndless ? i18n.t('btn_next_endless') : i18n.t('btn_next_level', { next: this.levelId + 1 }),
+    if (isPort) {
+      // In portrait: Timer and Audio toggle in header
+      this.timerText = this.add.text(width - 110, 31, this.formatTime(this.timeRemaining), {
+        fontSize: '15px',
+        fontFamily: FONTS.MONO,
+        color: '#ffd000',
+        fontStyle: 'bold',
+      });
+      this.timerText.setOrigin(0.5);
+      this.timerText.setDepth(105);
+
+      // Audio toggle
+      const audioContainer = this.add.container(width - 45, 31);
+      audioContainer.setDepth(105);
+      const audioBg = this.add.rectangle(0, 0, 36, 30, 0x0e243c, 0.92);
+      audioBg.setStrokeStyle(1.5, 0x00f0ff, 0.8);
+      audioBg.setInteractive({ useHandCursor: true });
+      const audioIcon = this.add.text(0, 0, audio.isMuted() ? '🔇' : '🔊', { fontSize: '14px' });
+      audioIcon.setOrigin(0.5);
+      audioContainer.add([audioBg, audioIcon]);
+      audioBg.on('pointerdown', () => {
+        const nowMuted = audio.toggleMute();
+        audioIcon.setText(nowMuted ? '🔇' : '🔊');
+        if (!nowMuted) {
+          audio.playButtonClick();
+          audio.startBGM();
+        }
+      });
+    } else {
+      // In landscape
+      this.timerText = this.add.text(width - 210, 31, this.formatTime(this.timeRemaining), {
+        fontSize: '16px',
+        fontFamily: FONTS.MONO,
+        color: '#ffd000',
+        fontStyle: 'bold',
+      });
+      this.timerText.setOrigin(0.5);
+      this.timerText.setDepth(105);
+
+      // Audio Sound Toggle Button
+      const audioContainer = this.add.container(width - 120, 31);
+      audioContainer.setDepth(105);
+      const audioBg = this.add.rectangle(0, 0, 38, 30, 0x0e243c, 0.92);
+      audioBg.setStrokeStyle(1.5, 0x00f0ff, 0.8);
+      audioBg.setInteractive({ useHandCursor: true });
+      const audioIcon = this.add.text(0, 0, audio.isMuted() ? '🔇' : '🔊', { fontSize: '15px' });
+      audioIcon.setOrigin(0.5);
+      audioContainer.add([audioBg, audioIcon]);
+      audioBg.on('pointerdown', () => {
+        const nowMuted = audio.toggleMute();
+        audioIcon.setText(nowMuted ? '🔇' : '🔊');
+        if (!nowMuted) {
+          audio.playButtonClick();
+          audio.startBGM();
+        }
+      });
+
+      // Restart button
+      const restartContainer = this.add.container(width - 55, 31);
+      restartContainer.setDepth(105);
+      const restartBg = this.add.rectangle(0, 0, 72, 30, 0x2e1224, 0.92);
+      restartBg.setStrokeStyle(1.5, 0xff5277, 0.85);
+      restartBg.setInteractive({ useHandCursor: true });
+      const restartText = this.add.text(0, 0, `↻ ${i18n.getLanguage() === 'vi' ? 'LÀM LẠI' : 'RETRY'}`, {
+        fontSize: '11px',
+        fontFamily: FONTS.TITLE,
+        color: '#ff88aa',
+        fontStyle: 'bold',
+      });
+      restartText.setOrigin(0.5);
+      restartContainer.add([restartBg, restartText]);
+      restartBg.on('pointerdown', () => {
+        audio.playButtonClick();
+        this.restartCurrentLevel();
+      });
+    }
+  }
+
+  private drawPortraitUI(): void {
+    const width = this.scale.width;
+    const px = 15;
+    const pw = width - 30;
+
+    // 1. Top HUD Status Bar (Y: 66 to 134, H: 68)
+    const topPy = 66;
+    const topPh = 68;
+    const topBar = this.add.graphics();
+    topBar.fillStyle(COLORS.UI_PANEL, 0.94);
+    topBar.lineStyle(1.5, COLORS.CYBER_CYAN, 0.5);
+    topBar.fillRoundedRect(px, topPy, pw, topPh, 10);
+    topBar.strokeRoundedRect(px, topPy, pw, topPh, 10);
+    topBar.setDepth(80);
+
+    // Moves display & Stars preview on Left
+    this.movesText = this.add.text(px + 14, topPy + 16, '', {
+      fontSize: '15px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffffff',
+      fontStyle: 'bold',
+    });
+    this.movesText.setDepth(81);
+
+    this.starsPreviewText = this.add.text(px + 14, topPy + 38, '⭐⭐⭐', {
+      fontSize: '18px',
+    });
+    this.starsPreviewText.setDepth(81);
+    this.updateMovesDisplay();
+
+    // LED status in center
+    const statCenter = px + pw * 0.46;
+    this.ledStatusText = this.add.text(statCenter, topPy + 34, `${i18n.t('led_outputs')}: 0/${this.leds.length}`, {
+      fontSize: '14px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
+      fontStyle: 'bold',
+    });
+    this.ledStatusText.setOrigin(0.5);
+    this.ledStatusText.setDepth(81);
+
+    // Hint button on right
+    const hintX = px + pw - 105;
+    const hintBtn = this.createPanelButton(hintX, topPy + 34, 84, 36, `💡 ${this.availableHints}`, COLORS.CYBER_YELLOW, () => {
+      this.useHint();
+    });
+    this.hintBtnText = hintBtn.getAt(1) as Phaser.GameObjects.Text;
+
+    // Restart button on far right
+    const restartX = px + pw - 38;
+    this.createPanelButton(restartX, topPy + 34, 42, 36, '↻', 0xff5277, () => {
+      this.restartCurrentLevel();
+    });
+
+    // 2. Bottom Inspector & Mobile Touch Controls (Y: 790 to 1260, H: 470)
+    const botPy = 790;
+    const botPh = 470;
+    const botPanel = this.add.graphics();
+    botPanel.fillStyle(COLORS.UI_PANEL, 0.94);
+    botPanel.lineStyle(1.5, COLORS.CYBER_CYAN, 0.5);
+    botPanel.fillRoundedRect(px, botPy, pw, botPh, 10);
+    botPanel.strokeRoundedRect(px, botPy, pw, botPh, 10);
+    botPanel.setDepth(80);
+
+    // Inspector Header
+    const hdr = this.add.text(px + pw / 2, botPy + 20, i18n.t('gate_inspector_title'), {
+      fontSize: '14px',
+      fontFamily: FONTS.TITLE,
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    hdr.setOrigin(0.5);
+    hdr.setDepth(81);
+
+    // Divider
+    const div = this.add.graphics();
+    div.lineStyle(1, 0x1b3c66, 0.6);
+    div.lineBetween(px + 15, botPy + 38, px + pw - 15, botPy + 38);
+    div.setDepth(81);
+
+    // Inspector Container for dynamic content
+    this.inspectorContainer = this.add.container(px, botPy + 44);
+    this.inspectorContainer.setDepth(82);
+
+    // Render default inspector
+    this.renderDefaultInspector();
+
+    // Bottom Large Mobile Touch Action Buttons
+    const touchBtnY = botPy + botPh - 54;
+    const rotLeftW = 175;
+    const rotRightW = 220;
+    const cheatW = 145;
+
+    // Rotate Left CCW
+    this.createPanelButton(px + 16 + rotLeftW / 2, touchBtnY, rotLeftW, 46, i18n.t('btn_rotate_left'), COLORS.CYBER_CYAN, () => {
+      this.rotateSelectedOrTargetGate(-1);
+    });
+
+    // Rotate Right CW (Primary)
+    this.createPanelButton(px + pw / 2, touchBtnY, rotRightW, 46, i18n.t('btn_rotate_right'), COLORS.SIGNAL_ON, () => {
+      this.rotateSelectedOrTargetGate(1);
+    });
+
+    // Cheat Sheet
+    this.createPanelButton(px + pw - 16 - cheatW / 2, touchBtnY, cheatW, 46, `📖 ${i18n.t('btn_cheat_sheet')}`, COLORS.CYBER_YELLOW, () => {
+      this.toggleCheatSheet();
+    });
+
+    // Subtitle helper for touch
+    const isVi = i18n.getLanguage() === 'vi';
+    const touchHelper = this.add.text(
+      px + pw / 2,
+      botPy + botPh - 15,
+      isVi ? '📱 Chạm cổng trên lưới để xoay hoặc dùng nút xoay bên dưới' : '📱 Tap any gate on grid or use rotate buttons below',
+      {
+        fontSize: '11px',
+        fontFamily: FONTS.UI,
+        color: '#6e93b8',
+      }
+    );
+    touchHelper.setOrigin(0.5);
+    touchHelper.setDepth(81);
+  }
+
+  private drawLeftPanel(): void {
+    const px = 20;
+    const py = 76;
+    const pw = 255;
+    const ph = 624;
+
+    const panel = this.add.graphics();
+    panel.fillStyle(COLORS.UI_PANEL, 0.94);
+    panel.lineStyle(1.5, COLORS.CYBER_CYAN, 0.5);
+    panel.fillRoundedRect(px, py, pw, ph, 10);
+    panel.strokeRoundedRect(px, py, pw, ph, 10);
+    panel.setDepth(80);
+
+    // Panel Header
+    const hdr = this.add.text(px + pw / 2, py + 22, 'STATUS TERMINAL', {
+      fontSize: '15px',
+      fontFamily: FONTS.TITLE,
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    hdr.setOrigin(0.5);
+    hdr.setDepth(81);
+
+    // Divider line
+    const div = this.add.graphics();
+    div.lineStyle(1, 0x1b3c66, 0.6);
+    div.lineBetween(px + 15, py + 42, px + pw - 15, py + 42);
+    div.setDepth(81);
+
+    // Moves display
+    this.movesText = this.add.text(px + pw / 2, py + 68, '', {
+      fontSize: '16px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffffff',
+      fontStyle: 'bold',
+    });
+    this.movesText.setOrigin(0.5);
+    this.movesText.setDepth(81);
+
+    // Stars Preview
+    this.starsPreviewText = this.add.text(px + pw / 2, py + 98, '⭐⭐⭐', {
+      fontSize: '22px',
+    });
+    this.starsPreviewText.setOrigin(0.5);
+    this.starsPreviewText.setDepth(81);
+    this.updateMovesDisplay();
+
+    // Par Info
+    const parLabel = this.add.text(
+      px + pw / 2,
+      py + 128,
+      `${i18n.t('par_label')}: ${this.parMoves} (3★) | MAX: ${this.maxMoves}`,
+      {
+        fontSize: '12px',
+        fontFamily: FONTS.MONO,
+        color: '#ffd000',
+      }
+    );
+    parLabel.setOrigin(0.5);
+    parLabel.setDepth(81);
+
+    // Action Buttons: Rotate Left & Right
+    const btnW = pw - 30;
+    const btnH = 38;
+    const btnStartX = px + pw / 2;
+
+    this.createPanelButton(btnStartX, py + 180, btnW, btnH, i18n.t('btn_rotate_right'), COLORS.SIGNAL_ON, () => {
+      this.rotateSelectedOrTargetGate(1);
+    });
+
+    this.createPanelButton(btnStartX, py + 226, btnW, btnH, i18n.t('btn_rotate_left'), COLORS.CYBER_CYAN, () => {
+      this.rotateSelectedOrTargetGate(-1);
+    });
+
+    // Hint Button
+    const hintBtn = this.createPanelButton(btnStartX, py + 282, btnW, btnH, `💡 ${i18n.t('btn_hint')} (${this.availableHints})`, COLORS.CYBER_YELLOW, () => {
+      this.useHint();
+    });
+    this.hintBtnText = hintBtn.getAt(1) as Phaser.GameObjects.Text;
+
+    // Cheat Sheet / Logic Guide Button
+    this.createPanelButton(btnStartX, py + 328, btnW, btnH, `📖 ${i18n.t('btn_cheat_sheet')}`, COLORS.CYBER_CYAN, () => {
+      this.toggleCheatSheet();
+    });
+
+    // Tutorial Box
+    const tutY = py + 382;
+    const tutH = 110;
+    const tutBg = this.add.graphics();
+    tutBg.fillStyle(0x081729, 0.9);
+    tutBg.lineStyle(1, 0x1d4470, 0.8);
+    tutBg.fillRoundedRect(px + 12, tutY, pw - 24, tutH, 6);
+    tutBg.strokeRoundedRect(px + 12, tutY, pw - 24, tutH, 6);
+    tutBg.setDepth(81);
+
+    const tutTitle = this.add.text(px + 22, tutY + 10, '💡 MISSION INTEL', {
+      fontSize: '11px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
+      fontStyle: 'bold',
+    });
+    tutTitle.setDepth(82);
+
+    const tutDesc = this.add.text(px + 22, tutY + 30, this.tutorialText, {
+      fontSize: '13px',
+      fontFamily: FONTS.UI,
+      color: '#d0e8ff',
+      wordWrap: { width: pw - 44 },
+      lineSpacing: 3,
+    });
+    tutDesc.setDepth(82);
+
+    // Mouse / Keyboard Guide at Bottom of Left Panel
+    const guideY = py + ph - 85;
+    const isVi = i18n.getLanguage() === 'vi';
+    const guideText = isVi
+      ? '🎮 MŨI TÊN / WASD: Di chuyển\nSPACE / ENTER: Xoay Thuận (↻)\nQ: Xoay Ngược (↺)\n🖱️ Click Chuột: Trái (↻) | Phải (↺)'
+      : '🎮 ARROWS / WASD: Move Player\nSPACE / ENTER: Rotate CW (↻)\nQ: Rotate CCW (↺)\n🖱️ Mouse: Left (↻) | Right (↺)';
+
+    const mouseGuide = this.add.text(
+      px + pw / 2,
+      guideY,
+      guideText,
+      {
+        fontSize: '11px',
+        fontFamily: FONTS.UI,
+        color: '#6e93b8',
+        align: 'center',
+        lineSpacing: 2,
+      }
+    );
+    mouseGuide.setOrigin(0.5, 0);
+    mouseGuide.setDepth(82);
+  }
+
+  private createPanelButton(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    text: string,
+    strokeColor: number,
+    callback: () => void
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+    container.setDepth(85);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0e243c, 0.95);
+    bg.lineStyle(1.5, strokeColor, 0.8);
+    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
+    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
+
+    const label = this.add.text(0, 0, text, {
+      fontSize: '13px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffffff',
+      fontStyle: 'bold',
+    });
+    label.setOrigin(0.5);
+
+    container.add([bg, label]);
+
+    const hit = this.add.zone(0, 0, w, h);
+    hit.setInteractive({ useHandCursor: true });
+
+    hit.on('pointerover', () => {
+      bg.clear();
+      bg.fillStyle(0x153c63, 1);
+      bg.lineStyle(2, strokeColor, 1);
+      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
+      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
+      label.setColor('#00ffff');
+    });
+
+    hit.on('pointerout', () => {
+      bg.clear();
+      bg.fillStyle(0x0e243c, 0.95);
+      bg.lineStyle(1.5, strokeColor, 0.8);
+      bg.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
+      bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
+      label.setColor('#ffffff');
+    });
+
+    hit.on('pointerdown', () => {
+      audio.playButtonClick();
+      this.tweens.add({
+        targets: container,
+        scaleX: 0.94,
+        scaleY: 0.94,
+        duration: 60,
+        yoyo: true,
+        onComplete: callback,
+      });
+    });
+
+    container.add(hit);
+    return container;
+  }
+
+  private drawRightInspectorPanel(): void {
+    const px = 1005;
+    const py = 76;
+    const pw = 255;
+    const ph = 624;
+
+    const panel = this.add.graphics();
+    panel.fillStyle(COLORS.UI_PANEL, 0.94);
+    panel.lineStyle(1.5, COLORS.CYBER_CYAN, 0.5);
+    panel.fillRoundedRect(px, py, pw, ph, 10);
+    panel.strokeRoundedRect(px, py, pw, ph, 10);
+    panel.setDepth(80);
+
+    // Inspector Header
+    const hdr = this.add.text(px + pw / 2, py + 22, i18n.t('gate_inspector_title'), {
+      fontSize: '15px',
+      fontFamily: FONTS.TITLE,
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    hdr.setOrigin(0.5);
+    hdr.setDepth(81);
+
+    // Divider
+    const div = this.add.graphics();
+    div.lineStyle(1, 0x1b3c66, 0.6);
+    div.lineBetween(px + 15, py + 42, px + pw - 15, py + 42);
+    div.setDepth(81);
+
+    // Container for dynamic inspector content
+    this.inspectorContainer = this.add.container(px, py + 50);
+    this.inspectorContainer.setDepth(82);
+
+    // LED Status Bar at bottom of Right Panel
+    const statusY = py + ph - 64;
+    const statBg = this.add.graphics();
+    statBg.fillStyle(0x071526, 0.95);
+    statBg.lineStyle(1.5, COLORS.SIGNAL_ON, 0.6);
+    statBg.fillRoundedRect(px + 12, statusY, pw - 24, 46, 6);
+    statBg.strokeRoundedRect(px + 12, statusY, pw - 24, 46, 6);
+    statBg.setDepth(81);
+
+    this.ledStatusText = this.add.text(px + pw / 2, statusY + 23, `${i18n.t('led_outputs')}: 0/${this.leds.length}`, {
+      fontSize: '14px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
+      fontStyle: 'bold',
+    });
+    this.ledStatusText.setOrigin(0.5);
+    this.ledStatusText.setDepth(82);
+
+    // Render default inspector content
+    this.renderDefaultInspector();
+  }
+
+  private renderDefaultInspector(): void {
+    this.inspectorContainer.removeAll(true);
+    const isPort = OrientationManager.isPortrait(this);
+    const pw = isPort ? this.scale.width - 30 : 255;
+
+    const idleText = this.add.text(
+      pw / 2,
+      isPort ? 45 : 60,
+      'SELECT A GATE\nTO INSPECT TRUTH TABLE',
+      {
+        fontSize: isPort ? '13px' : '14px',
+        fontFamily: FONTS.TITLE,
+        color: '#6e93b8',
+        align: 'center',
+        lineSpacing: 6,
+      }
+    );
+    idleText.setOrigin(0.5);
+
+    const circuitStatus = this.add.text(
+      pw / 2,
+      isPort ? 115 : 170,
+      `CIRCUIT OBJECTIVE:\nLight all target LEDs within par moves!`,
+      {
+        fontSize: '14px',
+        fontFamily: FONTS.UI,
+        color: '#ffd000',
+        align: 'center',
+        lineSpacing: 6,
+      }
+    );
+    circuitStatus.setOrigin(0.5);
+
+    this.inspectorContainer.add([idleText, circuitStatus]);
+
+    if (isPort) {
+      const missionIntel = this.add.text(
+        pw / 2,
+        185,
+        `💡 ${this.tutorialText}`,
+        {
+          fontSize: '13px',
+          fontFamily: FONTS.UI,
+          color: '#d0e8ff',
+          align: 'center',
+          wordWrap: { width: pw - 60 },
+          lineSpacing: 4,
+        }
+      );
+      missionIntel.setOrigin(0.5);
+      this.inspectorContainer.add(missionIntel);
+    }
+  }
+
+  private renderGateInspector(cell: GateDefinition, row: number, col: number): void {
+    this.inspectorContainer.removeAll(true);
+    const isPort = OrientationManager.isPortrait(this);
+    const pw = isPort ? this.scale.width - 30 : 255;
+
+    const cellState = this.signalEngine.getCellStates()[row]?.[col];
+    const inSignals = cellState?.inputSignals || [];
+    const outSignal = cellState?.outputSignal ?? 0;
+
+    // Gate Name
+    const gateTitle = this.add.text(pw / 2, 16, this.getGateName(cell.type), {
+      fontSize: isPort ? '17px' : '16px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
+      fontStyle: 'bold',
+    });
+    gateTitle.setOrigin(0.5);
+
+    // Live Signal Monitor
+    const inA = inSignals.length > 0 ? inSignals[0] : 0;
+    const inB = inSignals.length > 1 ? inSignals[1] : 0;
+    const sigStatus = this.add.text(
+      pw / 2,
+      isPort ? 42 : 44,
+      `IN: [${inA}, ${inB}] ➔ OUT: [${outSignal}]`,
       {
         fontSize: '13px',
-        fontFamily: 'monospace',
-        color: '#061a12',
+        fontFamily: FONTS.MONO,
+        color: outSignal === 1 ? '#00ff9d' : '#88a4c2',
         fontStyle: 'bold',
       }
     );
-    nextHdrText.setOrigin(0.5);
-    this.headerNextBtn.add([nextHdrBg, nextHdrText]);
-    this.headerNextBtn.setVisible(false);
+    sigStatus.setOrigin(0.5);
 
-    nextHdrBg.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.loadNextLevel(this.levelId + 1);
-    });
-
-    // Digital Countdown Timer Display
-    this.timerText = this.add.text(GAME_WIDTH - 25, 24, this.formatTime(this.timeRemaining), {
-      fontSize: '15px',
-      fontFamily: 'monospace',
-      color: '#ffd000',
-      fontStyle: 'bold',
-    });
-    this.timerText.setOrigin(1, 0);
-    this.timerText.setDepth(1000);
-
-    // Audio Sound Toggle Button
-    const audioContainer = this.add.container(GAME_WIDTH - 138, 66);
-    audioContainer.setDepth(1002);
-    const audioBg = this.add.rectangle(0, 0, 38, 30, 0x10253f, 0.92);
-    audioBg.setStrokeStyle(1.5, 0x00f0ff, 0.8);
-    audioBg.setInteractive({ useHandCursor: true });
-    const audioIcon = this.add.text(0, 0, audio.isMuted() ? '🔇' : '🔊', {
-      fontSize: '15px',
-    });
-    audioIcon.setOrigin(0.5);
-    audioContainer.add([audioBg, audioIcon]);
-
-    audioBg.on('pointerdown', () => {
-      const nowMuted = audio.toggleMute();
-      audioIcon.setText(nowMuted ? '🔇' : '🔊');
-      if (!nowMuted) {
-        audio.playButtonClick();
-        audio.startBGM();
-      }
-    });
-
-    // Restart button
-    const restartContainer = this.add.container(GAME_WIDTH - 65, 66);
-    restartContainer.setDepth(1002);
-    const restartBg = this.add.rectangle(0, 0, 96, 30, 0x301525, 0.92);
-    restartBg.setStrokeStyle(1.5, 0xff6688, 0.85);
-    restartBg.setInteractive({ useHandCursor: true });
-    const restartText = this.add.text(0, 0, `↻ ${i18n.getLanguage() === 'vi' ? 'LÀM LẠI' : 'RETRY'}`, {
+    // Truth Table Title
+    const ttHeader = this.add.text(pw / 2, isPort ? 68 : 78, i18n.t('truth_table_title'), {
       fontSize: '12px',
-      fontFamily: 'monospace',
-      color: '#ff88aa',
+      fontFamily: FONTS.TITLE,
+      color: '#00f0ff',
       fontStyle: 'bold',
     });
-    restartText.setOrigin(0.5);
-    restartContainer.add([restartBg, restartText]);
+    ttHeader.setOrigin(0.5);
 
-    restartBg.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.restartCurrentLevel();
-    });
-  }
+    // Draw Truth Table Rows
+    const tableData = this.getTruthTableData(cell.type);
+    let tableEndY = isPort ? 86 : 96;
+    if (tableData) {
+      const tableW = isPort ? Math.min(360, pw - 40) : pw - 30;
+      const tableX = (pw - tableW) / 2;
+      const tableY = isPort ? 84 : 96;
+      const rowCount = tableData.rows.length;
+      const tableH = rowCount * 24 + 28;
+      tableEndY = tableY + tableH;
 
-  private formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    const mStr = mins < 10 ? `0${mins}` : `${mins}`;
-    const sStr = secs < 10 ? `0${secs}` : `${secs}`;
-    return `⏱️ ${mStr}:${sStr}`;
-  }
+      const tableBg = this.add.graphics();
+      tableBg.fillStyle(0x071526, 0.9);
+      tableBg.lineStyle(1, 0x1a3b5c, 0.8);
+      tableBg.fillRoundedRect(tableX, tableY, tableW, tableH, 6);
+      tableBg.strokeRoundedRect(tableX, tableY, tableW, tableH, 6);
+      this.inspectorContainer.add(tableBg);
 
-  private updateTimerBar(): void {
-    if (!this.timerBarGraphics) return;
+      // Header row
+      const hdrRow = this.add.text(pw / 2, tableY + 14, `${tableData.headers.join('   |   ')}`, {
+        fontSize: '12px',
+        fontFamily: FONTS.MONO,
+        color: '#ffd000',
+        fontStyle: 'bold',
+      });
+      hdrRow.setOrigin(0.5);
+      this.inspectorContainer.add(hdrRow);
 
-    this.timerBarGraphics.clear();
-    const ratio = Math.max(0, this.timeRemaining / this.totalTimeLimit);
+      // Data rows
+      tableData.rows.forEach((r, idx) => {
+        const rowY = tableY + 38 + idx * 24;
+        const isMatch = r[0] === inA && (tableData.headers.length === 2 || r[1] === inB);
 
-    this.timerBarGraphics.fillStyle(0x112233, 1);
-    this.timerBarGraphics.fillRect(0, 0, GAME_WIDTH, 4);
+        if (isMatch) {
+          const matchHighlight = this.add.graphics();
+          matchHighlight.fillStyle(0x00ff9d, 0.2);
+          matchHighlight.fillRect(tableX + 2, rowY - 10, tableW - 4, 20);
+          this.inspectorContainer.add(matchHighlight);
+        }
 
-    let barColor = COLORS.SIGNAL_ON;
-    if (this.timeRemaining <= 15) {
-      barColor = 0xff0055;
-    } else if (ratio < 0.4) {
-      barColor = COLORS.CYBER_YELLOW;
+        const rowText = this.add.text(pw / 2, rowY, r.join('   |   '), {
+          fontSize: '13px',
+          fontFamily: FONTS.MONO,
+          color: isMatch ? '#00ff9d' : '#88a4c2',
+          fontStyle: isMatch ? 'bold' : 'normal',
+        });
+        rowText.setOrigin(0.5);
+        this.inspectorContainer.add(rowText);
+      });
     }
 
-    this.timerBarGraphics.fillStyle(barColor, 1);
-    this.timerBarGraphics.fillRect(0, 0, GAME_WIDTH * ratio, 4);
-  }
-
-  private drawTutorialBanner(): void {
-    const bannerY = 114;
-    const bannerH = 68;
-    const bannerW = GAME_WIDTH - 40;
-
-    const bannerBg = this.add.graphics();
-    bannerBg.fillStyle(0x0c2036, 0.88);
-    bannerBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.6);
-    bannerBg.fillRoundedRect(20, bannerY, bannerW, bannerH, 10);
-    bannerBg.strokeRoundedRect(20, bannerY, bannerW, bannerH, 10);
-    bannerBg.setDepth(90);
-
-    const guideIcon = this.add.text(36, bannerY + bannerH / 2, '💡', {
-      fontSize: '22px',
-    });
-    guideIcon.setOrigin(0, 0.5);
-    guideIcon.setDepth(91);
-
-    const guideText = this.add.text(72, bannerY + 12, this.tutorialText, {
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      color: '#d0e8ff',
-      wordWrap: { width: bannerW - 84 },
+    // Explanation text at bottom of table
+    const descY = tableEndY + (isPort ? 14 : 18);
+    const descText = this.add.text(pw / 2, descY, this.getGateRuleText(cell.type), {
+      fontSize: '13px',
+      fontFamily: FONTS.UI,
+      color: '#d0e5ff',
+      align: 'center',
+      wordWrap: { width: pw - 36 },
       lineSpacing: 4,
     });
-    guideText.setDepth(91);
+    descText.setOrigin(0.5, 0);
+
+    this.inspectorContainer.add([gateTitle, sigStatus, ttHeader, descText]);
+
+    if (isPort) {
+      const missionIntel = this.add.text(
+        pw / 2,
+        descY + 44,
+        `💡 ${this.tutorialText}`,
+        {
+          fontSize: '12px',
+          fontFamily: FONTS.UI,
+          color: '#ffd000',
+          align: 'center',
+          wordWrap: { width: pw - 50 },
+          lineSpacing: 3,
+        }
+      );
+      missionIntel.setOrigin(0.5, 0);
+      this.inspectorContainer.add(missionIntel);
+    }
+  }
+
+  private getGateName(type: GateType): string {
+    switch (type) {
+      case GateType.AND: return 'AND GATE (&)';
+      case GateType.OR: return 'OR GATE (≥1)';
+      case GateType.NOT: return 'NOT INVERTER (1)';
+      case GateType.XOR: return 'XOR GATE (=1)';
+      case GateType.NAND: return 'NAND GATE (⊼)';
+      case GateType.NOR: return 'NOR GATE (⊽)';
+      case GateType.XNOR: return 'XNOR GATE (≡)';
+      case GateType.DIODE: return 'DIODE (▷|)';
+      case GateType.WIRE: return 'STRAIGHT WIRE';
+      case GateType.WIRE_CORNER: return 'CORNER WIRE';
+      case GateType.SPLIT: return 'T-SPLITTER';
+      case GateType.CROSSOVER: return 'WIRE BRIDGE (┼)';
+      case GateType.SOURCE: return 'POWER SOURCE';
+      case GateType.LED: return 'OUTPUT LED';
+      default: return 'LOGIC GATE';
+    }
+  }
+
+  private getTruthTableData(type: GateType): { headers: string[]; rows: (number | string)[][] } | null {
+    switch (type) {
+      case GateType.AND:
+        return {
+          headers: ['A', 'B', 'OUT'],
+          rows: [
+            [0, 0, 0],
+            [0, 1, 0],
+            [1, 0, 0],
+            [1, 1, 1],
+          ],
+        };
+      case GateType.OR:
+        return {
+          headers: ['A', 'B', 'OUT'],
+          rows: [
+            [0, 0, 0],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1],
+          ],
+        };
+      case GateType.NOT:
+        return {
+          headers: ['IN', 'OUT'],
+          rows: [
+            [0, 1],
+            [1, 0],
+          ],
+        };
+      case GateType.XOR:
+        return {
+          headers: ['A', 'B', 'OUT'],
+          rows: [
+            [0, 0, 0],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 1, 0],
+          ],
+        };
+      case GateType.NAND:
+        return {
+          headers: ['A', 'B', 'OUT'],
+          rows: [
+            [0, 0, 1],
+            [0, 1, 1],
+            [1, 0, 1],
+            [1, 1, 0],
+          ],
+        };
+      case GateType.NOR:
+        return {
+          headers: ['A', 'B', 'OUT'],
+          rows: [
+            [0, 0, 1],
+            [0, 1, 0],
+            [1, 0, 0],
+            [1, 1, 0],
+          ],
+        };
+      case GateType.XNOR:
+        return {
+          headers: ['A', 'B', 'OUT'],
+          rows: [
+            [0, 0, 1],
+            [0, 1, 0],
+            [1, 0, 0],
+            [1, 1, 1],
+          ],
+        };
+      default:
+        return null;
+    }
+  }
+
+  private getGateRuleText(type: GateType): string {
+    switch (type) {
+      case GateType.AND:
+        return 'Outputs 1 ONLY if BOTH inputs A & B are 1.';
+      case GateType.OR:
+        return 'Outputs 1 if AT LEAST ONE input is 1.';
+      case GateType.NOT:
+        return 'Inverts the signal: 0 becomes 1, 1 becomes 0.';
+      case GateType.XOR:
+        return 'Outputs 1 if inputs are DIFFERENT (1 & 0).';
+      case GateType.NAND:
+        return 'Inverted AND: Outputs 0 only when both inputs are 1.';
+      case GateType.NOR:
+        return 'Inverted OR: Outputs 1 only when both inputs are 0.';
+      case GateType.XNOR:
+        return 'Equivalence: Outputs 1 if inputs MATCH (0=0 or 1=1).';
+      case GateType.DIODE:
+        return 'One-way gate: Current only travels along arrow.';
+      case GateType.CROSSOVER:
+        return 'Independent bridge: Horizontal & vertical tracks do not interfere.';
+      case GateType.WIRE:
+      case GateType.WIRE_CORNER:
+      case GateType.SPLIT:
+        return 'Conductor wire: Transmits live power along connection arms.';
+      default:
+        return 'Digital circuit component.';
+    }
+  }
+
+  private showLevel1TutorialPrompt(): void {
+    // Center wire in level 1 is at r=1, c=1
+    const x = this.boardOffsetX + 1 * this.cellSize + this.cellSize / 2;
+    const y = this.boardOffsetY + 1 * this.cellSize + this.cellSize / 2;
+
+    this.tutorialPointer = this.add.container(x, y - 56);
+    this.tutorialPointer.setDepth(200);
+
+    const promptText = this.add.text(0, -20, '👆 CLICK TO ROTATE', {
+      fontSize: '14px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
+      fontStyle: 'bold',
+      backgroundColor: '#0c223c',
+      padding: { x: 8, y: 4 },
+    });
+    promptText.setOrigin(0.5);
+
+    const arrow = this.add.text(0, 8, '▼', {
+      fontSize: '18px',
+      color: '#00ff9d',
+    });
+    arrow.setOrigin(0.5);
+
+    this.tutorialPointer.add([promptText, arrow]);
+
+    this.tweens.add({
+      targets: this.tutorialPointer,
+      y: y - 44,
+      duration: 600,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
   }
 
   private createCellSprites(): void {
@@ -493,7 +1155,6 @@ export class GameScene extends Phaser.Scene {
 
         let metalPad: Phaser.GameObjects.Graphics | undefined;
         if (gate.fixed) {
-          // Render industrial locked metal pad under the gate
           metalPad = this.add.graphics();
           const halfSize = this.cellSize / 2 - 2;
           metalPad.fillStyle(COLORS.GATE_BODY_LOCKED, 1);
@@ -501,7 +1162,6 @@ export class GameScene extends Phaser.Scene {
           metalPad.fillRoundedRect(-halfSize, -halfSize, halfSize * 2, halfSize * 2, 6);
           metalPad.strokeRoundedRect(-halfSize, -halfSize, halfSize * 2, halfSize * 2, 6);
 
-          // Corner metal rivets
           const riv = halfSize - 5;
           metalPad.fillStyle(0x7c8c9e, 1);
           metalPad.fillCircle(-riv, -riv, 2.5);
@@ -514,8 +1174,8 @@ export class GameScene extends Phaser.Scene {
         const gateGraphics = this.add.graphics();
         const signalIndicator = this.add.graphics();
         const label = this.add.text(0, 0, '', {
-          fontSize: `${Math.round(this.cellSize * 0.2)}px`,
-          fontFamily: 'monospace',
+          fontSize: `${Math.round(this.cellSize * 0.22)}px`,
+          fontFamily: FONTS.TITLE,
           color: '#ffffff',
           fontStyle: 'bold',
         });
@@ -528,11 +1188,20 @@ export class GameScene extends Phaser.Scene {
         container.add([gateGraphics, signalIndicator, label, lockIcon]);
         this.boardContainer.add(container);
 
-        // Direct interactive hit area for instant cell tapping
+        // Interactive hit area
         const hitArea = new Phaser.Geom.Rectangle(-this.cellSize / 2, -this.cellSize / 2, this.cellSize, this.cellSize);
         container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+
         const cellR = r;
         const cellC = c;
+
+        // Hover handling
+        container.on('pointerover', () => {
+          this.activeHoveredCell = { row: cellR, col: cellC };
+          this.renderGateInspector(gate, cellR, cellC);
+        });
+
+        // Click handling: Left click = CW (+1), Right click = CCW (-1)
         container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
           if (this.isWon || this.isTimeOver || this.isOutOfMoves || this.isAnimating) return;
 
@@ -541,19 +1210,15 @@ export class GameScene extends Phaser.Scene {
             return;
           }
 
-          // 1. Select and highlight this active target cell
-          this.selectCell(cellR, cellC);
+          this.selectedCell = { row: cellR, col: cellC };
+          this.renderGateInspector(cellDef, cellR, cellC);
 
-          // 2. Right click on PC / mouse -> Rotate Left (-1)
-          if (pointer.rightButtonDown() || pointer.button === 2) {
-            this.handleCellTap(cellR, cellC, -1);
-            return;
+          if (this.tutorialPointer) {
+            this.tutorialPointer.destroy();
+            this.tutorialPointer = undefined;
           }
 
-          // 3. Screen horizontal coordinate test (Immune to container / gate rotation!):
-          // Center of this cell in screen coordinates
-          const cellCenterScreenX = this.boardOffsetX + this.boardContainer.x + (cellC * this.cellSize + this.cellSize / 2) * this.boardScale;
-          const direction: 1 | -1 = pointer.x < cellCenterScreenX ? -1 : 1;
+          const direction: 1 | -1 = pointer.rightButtonDown() || pointer.button === 2 ? -1 : 1;
           this.handleCellTap(cellR, cellC, direction);
         });
 
@@ -568,6 +1233,71 @@ export class GameScene extends Phaser.Scene {
 
         this.drawGateInCell(r, c);
       }
+    }
+  }
+
+  private rotateSelectedOrTargetGate(direction: 1 | -1): void {
+    const target = this.selectedCell || this.activeHoveredCell || this.findFirstRotatableGate();
+    if (!target) return;
+    this.handleCellTap(target.row, target.col, direction);
+  }
+
+  private findFirstRotatableGate(): { row: number; col: number } | null {
+    for (let r = 0; r < this.gridHeight; r++) {
+      for (let c = 0; c < this.gridWidth; c++) {
+        const cell = this.grid[r][c];
+        if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
+          return { row: r, col: c };
+        }
+      }
+    }
+    return null;
+  }
+
+  private handleCellTap(row: number, col: number, direction: 1 | -1 = 1): void {
+    if (this.isWon || this.isTimeOver || this.isOutOfMoves || this.isAnimating) return;
+
+    const cell = this.grid[row]?.[col];
+    if (!cell || cell.fixed || cell.locked || cell.type === GateType.SOURCE || cell.type === GateType.LED) {
+      return;
+    }
+
+    this.isAnimating = true;
+
+    // Update rotation
+    cell.rotation = (cell.rotation + direction + 4) % 4;
+    this.movesCount++;
+    this.updateMovesDisplay();
+
+    audio.playRotate(direction);
+
+    const sprite = this.cellSprites[row]?.[col];
+    if (sprite) {
+      const targetAngle = sprite.container.angle + direction * 90;
+      this.tweens.add({
+        targets: sprite.container,
+        angle: targetAngle,
+        scaleX: 1.12,
+        scaleY: 1.12,
+        duration: ANIM.ROTATE_DURATION,
+        ease: 'Back.easeOut',
+        yoyo: true,
+        onComplete: () => {
+          this.drawGateInCell(row, col);
+          audio.playFlow();
+          this.propagateSignals();
+          this.renderGateInspector(cell, row, col);
+          this.isAnimating = false;
+
+          // Check Out of moves
+          if (!this.isWon && this.movesCount >= this.maxMoves && !this.isOutOfMoves) {
+            this.triggerOutOfMoves();
+          }
+        },
+      });
+    } else {
+      this.isAnimating = false;
+      this.propagateSignals();
     }
   }
 
@@ -599,7 +1329,7 @@ export class GameScene extends Phaser.Scene {
     sprite.container.setAngle(cell.rotation * 90);
     sprite.label.setAngle(-cell.rotation * 90);
     sprite.label.setText(this.getGateLabel(cell.type));
-    sprite.label.setFontSize(Math.round(this.cellSize * 0.18));
+    sprite.label.setFontSize(Math.round(this.cellSize * 0.2));
 
     if (sprite.lockIcon) {
       sprite.lockIcon.setVisible(!!cell.locked);
@@ -694,7 +1424,6 @@ export class GameScene extends Phaser.Scene {
         break;
 
       case GateType.CROSSOVER:
-        // Horizontal Wire
         g.lineStyle(8, COLORS.SIGNAL_OFF, 1);
         g.beginPath();
         g.moveTo(-halfSize - 3, 0);
@@ -706,13 +1435,11 @@ export class GameScene extends Phaser.Scene {
         g.lineTo(halfSize + 3, 0);
         g.strokePath();
 
-        // Insulating jumper ring
         g.fillStyle(0x050c18, 0.95);
         g.fillCircle(0, 0, 10);
         g.lineStyle(1.5, 0x142844, 1);
         g.strokeCircle(0, 0, 10);
 
-        // Vertical jumper arch over horizontal
         g.lineStyle(8, COLORS.SIGNAL_OFF, 1);
         g.beginPath();
         g.moveTo(0, -halfSize - 3);
@@ -946,10 +1673,38 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private setupKeyboardControls(): void {
+    if (!this.input.keyboard) return;
+
+    this.cursors = this.input.keyboard.createCursorKeys();
+    this.wasdKeys = this.input.keyboard.addKeys('W,A,S,D') as any;
+
+    this.input.keyboard.on('keydown-R', () => {
+      if (this.isWon || this.isOutOfMoves) return;
+      this.rotateSelectedOrTargetGate(1);
+    });
+    this.input.keyboard.on('keydown-E', () => {
+      if (this.isWon || this.isOutOfMoves) return;
+      this.rotateSelectedOrTargetGate(1);
+    });
+    this.input.keyboard.on('keydown-SPACE', () => {
+      if (this.isWon || this.isOutOfMoves) return;
+      this.rotateSelectedOrTargetGate(1);
+    });
+    this.input.keyboard.on('keydown-ENTER', () => {
+      if (this.isWon || this.isOutOfMoves) return;
+      this.rotateSelectedOrTargetGate(1);
+    });
+    this.input.keyboard.on('keydown-Q', () => {
+      if (this.isWon || this.isOutOfMoves) return;
+      this.rotateSelectedOrTargetGate(-1);
+    });
+    this.input.keyboard.on('keydown-ESC', () => this.cleanupAndNavigate('LevelSelectScene'));
+  }
+
   private createPlayer(): void {
     let startR = Math.floor(this.gridHeight / 2);
     let startC = Math.floor(this.gridWidth / 2);
-
     for (let r = 0; r < this.gridHeight; r++) {
       for (let c = 0; c < this.gridWidth; c++) {
         const cell = this.grid[r][c];
@@ -960,935 +1715,35 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
-
     const startX = this.boardOffsetX + startC * this.cellSize + this.cellSize / 2;
     const startY = this.boardOffsetY + startR * this.cellSize + this.cellSize / 2;
 
     this.player = this.add.sprite(startX, startY, 'player_plumber');
     this.player.setScale((this.cellSize / CELL_SIZE) * 0.85);
-    this.player.setDepth(50);
+    this.player.setDepth(55);
+    this.player.setAlpha(0.92);
     this.boardContainer.add(this.player);
 
     this.tweens.add({
       targets: this.player,
-      scaleY: { from: (this.cellSize / CELL_SIZE) * 0.85, to: (this.cellSize / CELL_SIZE) * 0.9 },
-      scaleX: { from: (this.cellSize / CELL_SIZE) * 0.85, to: (this.cellSize / CELL_SIZE) * 0.82 },
+      scaleY: { from: (this.cellSize / CELL_SIZE) * 0.82, to: (this.cellSize / CELL_SIZE) * 0.88 },
       duration: 650,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-  }
 
-  private setupVirtualControls(): void {
-    const bottomControlsY = GAME_HEIGHT - 120;
-
-    // 1. Virtual Joystick
-    this.virtualJoystick = new VirtualJoystick(this, 115, bottomControlsY, 52);
-
-    const joyLabel = this.add.text(115, bottomControlsY + 70, `🎮 ${i18n.getLanguage() === 'vi' ? 'DI CHUYỂN' : 'MOVE'}`, {
-      fontSize: '12px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
-    });
-    joyLabel.setOrigin(0.5);
-    joyLabel.setDepth(150);
-
-    // 2. Action Buttons: ROTATE LEFT (↺) and ROTATE RIGHT (↻)
-    const btnLeftX = 515;
-    const btnRightX = 635;
-    const btnY = bottomControlsY;
-
-    // LEFT ROTATE BUTTON (↺ TRÁI)
-    this.leftActionButtonContainer = this.add.container(btnLeftX, btnY);
-    this.leftActionButtonContainer.setDepth(150);
-
-    const leftOuter = this.add.circle(0, 0, 42, 0x00f0ff, 0.12);
-    leftOuter.setStrokeStyle(1.5, 0x00f0ff, 0.5);
-
-    const leftBg = this.add.circle(0, 0, 36, 0x10253f, 0.95);
-    leftBg.setStrokeStyle(2.5, 0x00f0ff, 0.9);
-
-    const leftIconText = this.add.text(0, -6, '↺', {
-      fontSize: '32px',
-      fontStyle: 'bold',
-      color: '#00f0ff',
-    });
-    leftIconText.setOrigin(0.5);
-
-    const leftLabel = this.add.text(0, 46, i18n.t('btn_rotate_left'), {
-      fontSize: '11px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
-      fontStyle: 'bold',
-    });
-    leftLabel.setOrigin(0.5);
-
-    this.leftActionButtonContainer.add([leftOuter, leftBg, leftIconText, leftLabel]);
-
-    const leftZone = this.add.zone(btnLeftX, btnY, 80, 80);
-    leftZone.setInteractive({ useHandCursor: true });
-    leftZone.setDepth(151);
-    leftZone.on('pointerdown', () => {
-      this.tweens.add({
-        targets: this.leftActionButtonContainer,
-        scaleX: 0.88,
-        scaleY: 0.88,
-        duration: 70,
-        yoyo: true,
-      });
-      this.rotateCurrentOrTargetGate(-1);
-    });
-
-    // RIGHT ROTATE BUTTON (↻ PHẢI)
-    this.rightActionButtonContainer = this.add.container(btnRightX, btnY);
-    this.rightActionButtonContainer.setDepth(150);
-
-    const rightOuter = this.add.circle(0, 0, 46, 0xffd000, 0.15);
-    rightOuter.setStrokeStyle(2, 0xffd000, 0.6);
-
-    const rightBg = this.add.circle(0, 0, 40, 0x10253f, 0.95);
-    rightBg.setStrokeStyle(3, 0xffd000, 0.95);
-
-    const rightIconText = this.add.text(0, -6, '↻', {
-      fontSize: '36px',
-      fontStyle: 'bold',
-      color: '#ffd000',
-    });
-    rightIconText.setOrigin(0.5);
-
-    const rightLabel = this.add.text(0, 46, i18n.t('btn_rotate_right'), {
-      fontSize: '11px',
-      fontFamily: 'monospace',
-      color: '#ffd000',
-      fontStyle: 'bold',
-    });
-    rightLabel.setOrigin(0.5);
-
-    this.rightActionButtonContainer.add([rightOuter, rightBg, rightIconText, rightLabel]);
-
-    const rightZone = this.add.zone(btnRightX, btnY, 86, 86);
-    rightZone.setInteractive({ useHandCursor: true });
-    rightZone.setDepth(151);
-    rightZone.on('pointerdown', () => {
-      this.tweens.add({
-        targets: this.rightActionButtonContainer,
-        scaleX: 0.88,
-        scaleY: 0.88,
-        duration: 70,
-        yoyo: true,
-      });
-      this.rotateCurrentOrTargetGate(1);
-    });
-
-    // 3. Middle Helper Buttons: Hint & Cheat Sheet
-    const midY = bottomControlsY - 6;
-    this.createAuxiliaryButtons(midY);
-  }
-
-  private createAuxiliaryButtons(y: number): void {
-    const hintX = 265;
-    const cheatX = 365;
-
-    // Hint Button
-    const hintContainer = this.add.container(hintX, y);
-    hintContainer.setDepth(150);
-
-    const hintBg = this.add.graphics();
-    hintBg.fillStyle(0x112744, 0.9);
-    hintBg.lineStyle(2, COLORS.CYBER_YELLOW, 0.85);
-    hintBg.fillRoundedRect(-45, -35, 90, 70, 10);
-    hintBg.strokeRoundedRect(-45, -35, 90, 70, 10);
-
-    const hintIcon = this.add.text(0, -10, '💡', { fontSize: '24px' });
-    hintIcon.setOrigin(0.5);
-
-    this.hintBtnText = this.add.text(0, 18, `${i18n.t('btn_hint')} (${this.availableHints})`, {
-      fontSize: '11px',
-      fontFamily: 'monospace',
-      color: '#ffd000',
-      fontStyle: 'bold',
-    });
-    this.hintBtnText.setOrigin(0.5);
-
-    hintContainer.add([hintBg, hintIcon, this.hintBtnText]);
-
-    const hintZone = this.add.zone(hintX, y, 90, 70);
-    hintZone.setInteractive({ useHandCursor: true });
-    hintZone.setDepth(151);
-    hintZone.on('pointerdown', () => {
-      this.useHint();
-    });
-
-    // Cheat Sheet Button
-    const cheatContainer = this.add.container(cheatX, y);
-    cheatContainer.setDepth(150);
-
-    const cheatBg = this.add.graphics();
-    cheatBg.fillStyle(0x112744, 0.9);
-    cheatBg.lineStyle(2, COLORS.CYBER_CYAN, 0.85);
-    cheatBg.fillRoundedRect(-45, -35, 90, 70, 10);
-    cheatBg.strokeRoundedRect(-45, -35, 90, 70, 10);
-
-    const cheatIcon = this.add.text(0, -10, '📖', { fontSize: '24px' });
-    cheatIcon.setOrigin(0.5);
-
-    const cheatText = this.add.text(0, 18, i18n.t('btn_cheat_sheet'), {
-      fontSize: '11px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
-      fontStyle: 'bold',
-    });
-    cheatText.setOrigin(0.5);
-
-    cheatContainer.add([cheatBg, cheatIcon, cheatText]);
-
-    const cheatZone = this.add.zone(cheatX, y, 90, 70);
-    cheatZone.setInteractive({ useHandCursor: true });
-    cheatZone.setDepth(151);
-    cheatZone.on('pointerdown', () => {
-      this.toggleCheatSheet();
-    });
-    cheatZone.setDepth(151);
-    cheatZone.on('pointerdown', () => {
-      this.toggleCheatSheet();
-    });
-  }
-
-  private setupZoomAndPanControls(): void {
-    // Desktop Mouse Wheel Zoom
-    this.input.on('wheel', (_pointer: any, _gameObjects: any, _deltaX: number, deltaY: number) => {
-      const zoomFactor = deltaY > 0 ? 0.92 : 1.08;
-      this.setBoardZoom(this.boardScale * zoomFactor);
-    });
-
-    // Mobile Pinch-to-Zoom & 2-Finger Pan
-    this.input.on('pointermove', () => {
-      const pointer1 = this.input.pointer1;
-      const pointer2 = this.input.pointer2;
-
-      if (pointer1.isDown && pointer2.isDown) {
-        const dist = Phaser.Math.Distance.Between(pointer1.x, pointer1.y, pointer2.x, pointer2.y);
-        if (this.initialPinchDistance === 0) {
-          this.initialPinchDistance = dist;
-          this.initialScale = this.boardScale;
-        } else {
-          const factor = dist / this.initialPinchDistance;
-          this.setBoardZoom(this.initialScale * factor);
-        }
-      } else {
-        this.initialPinchDistance = 0;
-      }
-    });
-
-    // Drag-to-Pan (when dragged on background area)
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.y > 190 && pointer.y < GAME_HEIGHT - 220) {
-        this.isPanDragging = true;
-        this.panStartPos = { x: pointer.x, y: pointer.y };
-        this.containerStartPos = { x: this.boardContainer.x, y: this.boardContainer.y };
-      }
-    });
-
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (this.isPanDragging && (!this.input.pointer2.isDown)) {
-        const dx = pointer.x - this.panStartPos.x;
-        const dy = pointer.y - this.panStartPos.y;
-        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-          this.boardContainer.x = this.containerStartPos.x + dx;
-          this.boardContainer.y = this.containerStartPos.y + dy;
-        }
-      }
-    });
-
-    this.input.on('pointerup', () => {
-      this.isPanDragging = false;
-      this.initialPinchDistance = 0;
-    });
-  }
-
-  private setBoardZoom(scale: number): void {
-    this.boardScale = Phaser.Math.Clamp(scale, 0.65, 2.2);
-    this.boardContainer.setScale(this.boardScale);
-  }
-
-  private createResetZoomButton(): void {
-    const btnContainer = this.add.container(GAME_WIDTH - 65, 175);
-    btnContainer.setDepth(150);
-
-    const btnBg = this.add.graphics();
-    btnBg.fillStyle(0x10253f, 0.88);
-    btnBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.8);
-    btnBg.fillRoundedRect(-46, -16, 92, 32, 6);
-    btnBg.strokeRoundedRect(-46, -16, 92, 32, 6);
-
-    const btnText = this.add.text(0, 0, i18n.t('btn_fit_screen'), {
-      fontSize: '11px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
-      fontStyle: 'bold',
-    });
-    btnText.setOrigin(0.5);
-
-    btnContainer.add([btnBg, btnText]);
-
-    const zone = this.add.zone(0, 0, 92, 32);
-    zone.setInteractive({ useHandCursor: true });
-    zone.on('pointerdown', () => {
-      this.tweens.add({
-        targets: this.boardContainer,
-        x: 0,
-        y: 0,
-        scaleX: 1,
-        scaleY: 1,
-        duration: 250,
-        ease: 'Quad.easeOut',
-      });
-      this.boardScale = 1.0;
-    });
-    btnContainer.add(zone);
-  }
-
-  private drawBottomUI(): void {
-    const bottomBarY = GAME_HEIGHT - 230;
-
-    // Status Panel for LEDs & Multi-Test-Cases
-    const statusPanel = this.add.graphics();
-    statusPanel.fillStyle(0x0a1c32, 0.92);
-    statusPanel.lineStyle(1.5, COLORS.CYBER_CYAN, 0.6);
-    statusPanel.fillRoundedRect(20, bottomBarY, GAME_WIDTH - 40, 42, 8);
-    statusPanel.strokeRoundedRect(20, bottomBarY, GAME_WIDTH - 40, 42, 8);
-    statusPanel.setDepth(120);
-
-    this.ledStatusText = this.add.text(45, bottomBarY + 21, `${i18n.t('led_outputs')}: 0/0`, {
-      fontSize: '13px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
-      fontStyle: 'bold',
-    });
-    this.ledStatusText.setOrigin(0, 0.5);
-    this.ledStatusText.setDepth(121);
-
-    if (this.testCases && this.testCases.length > 0) {
-      this.clockStatusText = this.add.text(GAME_WIDTH - 45, bottomBarY + 21, `${i18n.t('clock_cycle')}: [1/${this.testCases.length}]`, {
-        fontSize: '12px',
-        fontFamily: 'monospace',
-        color: '#ffd000',
-        fontStyle: 'bold',
-      });
-      this.clockStatusText.setOrigin(1, 0.5);
-      this.clockStatusText.setDepth(121);
-    }
-  }
-
-  private updateLedStatus(): void {
-    if (!this.ledStatusText) return;
-
-    let satisfied = 0;
-    const states = this.signalEngine.getCellStates();
-
-    for (const led of this.leds) {
-      const st = states[led.row]?.[led.col];
-      const target = led.targetSignal ?? 1;
-      if (st && st.connected && st.inputSignals.length > 0) {
-        if (target === 1 && st.inputSignals.some((v) => v === 1)) {
-          satisfied++;
-        } else if (target === 0 && !st.inputSignals.some((v) => v === 1)) {
-          satisfied++;
-        }
-      }
-    }
-
-    const isAll = satisfied === this.leds.length;
-    this.ledStatusText.setText(`${i18n.t('led_outputs')}: ${satisfied}/${this.leds.length} ${isAll ? i18n.t('led_complete') : '⏳'}`);
-    this.ledStatusText.setColor(isAll ? '#00ff88' : '#ffd000');
-  }
-
-  private useHint(): void {
-    if (this.isWon || this.isTimeOver || this.isAnimating) return;
-
-    const wrongGates: { r: number; c: number; cell: GateDefinition }[] = [];
-
-    for (let r = 0; r < this.gridHeight; r++) {
-      for (let c = 0; c < this.gridWidth; c++) {
-        const cell = this.grid[r][c];
-        if (
-          cell &&
-          !cell.fixed &&
-          !cell.locked &&
-          cell.type !== GateType.SOURCE &&
-          cell.type !== GateType.LED &&
-          cell.rotation !== cell.correctRotation
-        ) {
-          wrongGates.push({ r, c, cell });
-        }
-      }
-    }
-
-    if (wrongGates.length === 0) {
-      this.showToast(i18n.t('toast_all_correct'));
-      return;
-    }
-
-    const target = wrongGates[0];
-    target.cell.rotation = target.cell.correctRotation;
-    target.cell.locked = true;
-
-    this.availableHints--;
-    audio.playHint();
-    if (this.hintBtnText) {
-      this.hintBtnText.setText(`${i18n.t('btn_hint')} (${Math.max(0, this.availableHints)})`);
-    }
-
-    const sprite = this.cellSprites[target.r]?.[target.c];
-    const targetX = this.boardOffsetX + target.c * this.cellSize + this.cellSize / 2;
-    const targetY = this.boardOffsetY + target.r * this.cellSize + this.cellSize / 2;
-
-    if (this.player) {
-      this.tweens.add({
-        targets: this.player,
-        x: targetX,
-        y: targetY,
-        duration: 200,
-        ease: 'Sine.easeOut',
-      });
-    }
-
-    if (sprite) {
-      this.tweens.add({
-        targets: sprite.container,
-        scaleX: 1.2,
-        scaleY: 1.2,
-        duration: 150,
-        yoyo: true,
-        ease: 'Back.easeOut',
-        onComplete: () => {
-          this.drawGateInCell(target.r, target.c);
-          this.createSparkEffect(targetX, targetY, true);
-          this.propagateSignals();
-        },
-      });
-    } else {
-      this.propagateSignals();
-    }
-
-    this.showToast(i18n.t('toast_hint_used'));
-  }
-
-  private toggleCheatSheet(): void {
-    if (this.cheatSheetGroup) {
-      this.cheatSheetGroup.destroy();
-      this.cheatSheetGroup = null;
-      return;
-    }
-
-    const container = this.add.container(0, 0);
-    container.setDepth(300);
-
-    const overlay = this.add.graphics();
-    overlay.fillStyle(0x000000, 0.85);
-    overlay.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
-    overlay.on('pointerdown', () => this.toggleCheatSheet());
-
-    const pw = 640;
-    const ph = 800;
-    const px = (GAME_WIDTH - pw) / 2;
-    const py = (GAME_HEIGHT - ph) / 2 - 10;
-
-    const panel = this.add.graphics();
-    panel.fillStyle(0x0a1c32, 0.98);
-    panel.lineStyle(2, COLORS.CYBER_CYAN, 0.9);
-    panel.fillRoundedRect(px, py, pw, ph, 14);
-    panel.strokeRoundedRect(px, py, pw, ph, 14);
-
-    const title = this.add.text(GAME_WIDTH / 2, py + 26, i18n.t('cheat_sheet_title'), {
-      fontSize: '20px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
-      fontStyle: 'bold',
-    });
-    title.setOrigin(0.5);
-
-    const cheatItems = [
-      { name: i18n.t('cheat_not_name'), rule: i18n.t('cheat_not_desc'), color: '#00f0ff' },
-      { name: i18n.t('cheat_and_name'), rule: i18n.t('cheat_and_desc'), color: '#ffd000' },
-      { name: i18n.t('cheat_nand_name'), rule: i18n.t('cheat_nand_desc'), color: '#ffb703' },
-      { name: i18n.t('cheat_or_name'), rule: i18n.t('cheat_or_desc'), color: '#00ff88' },
-      { name: i18n.t('cheat_nor_name'), rule: i18n.t('cheat_nor_desc'), color: '#06d6a0' },
-      { name: i18n.t('cheat_xor_name'), rule: i18n.t('cheat_xor_desc'), color: '#ff007f' },
-      { name: i18n.t('cheat_xnor_name'), rule: i18n.t('cheat_xnor_desc'), color: '#b5179e' },
-      { name: i18n.t('cheat_diode_name'), rule: i18n.t('cheat_diode_desc'), color: '#4cc9f0' },
-      { name: i18n.t('cheat_bridge_name'), rule: i18n.t('cheat_bridge_desc'), color: '#7209b7' },
-      { name: i18n.t('cheat_split_name'), rule: i18n.t('cheat_split_desc'), color: '#f72585' },
-    ];
-
-    let itemY = py + 62;
-    container.add([overlay, panel, title]);
-
-    for (const item of cheatItems) {
-      const card = this.add.graphics();
-      card.fillStyle(0x10253e, 0.85);
-      card.lineStyle(1.5, Phaser.Display.Color.HexStringToColor(item.color).color, 0.7);
-      card.fillRoundedRect(px + 20, itemY, pw - 40, 58, 6);
-      card.strokeRoundedRect(px + 20, itemY, pw - 40, 58, 6);
-
-      const header = this.add.text(px + 36, itemY + 10, item.name, {
-        fontSize: '14px',
-        fontFamily: 'monospace',
-        color: item.color,
-        fontStyle: 'bold',
-      });
-
-      const rule = this.add.text(px + 36, itemY + 32, item.rule, {
-        fontSize: '11px',
-        fontFamily: 'monospace',
-        color: '#cbe4ff',
-      });
-
-      container.add([card, header, rule]);
-      itemY += 66;
-    }
-
-    const closeBtn = this.add.text(GAME_WIDTH / 2, py + ph - 25, i18n.t('btn_close'), {
-      fontSize: '16px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
-      fontStyle: 'bold',
-    });
-    closeBtn.setOrigin(0.5);
-    closeBtn.setInteractive({ useHandCursor: true });
-    closeBtn.on('pointerdown', () => this.toggleCheatSheet());
-
-    container.add(closeBtn);
-    this.cheatSheetGroup = container;
-  }
-
-  private showToast(message: string): void {
-    const toast = this.add.text(GAME_WIDTH / 2, 200, message, {
-      fontSize: '13px',
-      fontFamily: 'monospace',
-      color: '#ffffff',
-      backgroundColor: '#004433',
-      padding: { x: 16, y: 8 },
-    });
-    toast.setOrigin(0.5);
-    toast.setDepth(250);
-
-    this.tweens.add({
-      targets: toast,
-      alpha: { from: 1, to: 0 },
-      y: 180,
-      duration: 1800,
-      onComplete: () => toast.destroy(),
-    });
-  }
-
-  private setupKeyboardControls(): void {
-    if (!this.input.keyboard) return;
-
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.keys = this.input.keyboard.addKeys({
-      w: Phaser.Input.Keyboard.KeyCodes.W,
-      a: Phaser.Input.Keyboard.KeyCodes.A,
-      s: Phaser.Input.Keyboard.KeyCodes.S,
-      d: Phaser.Input.Keyboard.KeyCodes.D,
-      q: Phaser.Input.Keyboard.KeyCodes.Q,
-      e: Phaser.Input.Keyboard.KeyCodes.E,
-      z: Phaser.Input.Keyboard.KeyCodes.Z,
-      space: Phaser.Input.Keyboard.KeyCodes.SPACE,
-      enter: Phaser.Input.Keyboard.KeyCodes.ENTER,
-    }) as { [key: string]: Phaser.Input.Keyboard.Key };
-
-    // Rotate Right (Clockwise): SPACE, E, ENTER
-    this.input.keyboard.on('keydown-SPACE', () => {
-      this.rotateCurrentOrTargetGate(1);
-    });
-    this.input.keyboard.on('keydown-E', () => {
-      this.rotateCurrentOrTargetGate(1);
-    });
-    this.input.keyboard.on('keydown-ENTER', () => {
-      this.rotateCurrentOrTargetGate(1);
-    });
-
-    // Rotate Left (Counter-Clockwise): Q, Z
-    this.input.keyboard.on('keydown-Q', () => {
-      this.rotateCurrentOrTargetGate(-1);
-    });
-    this.input.keyboard.on('keydown-Z', () => {
-      this.rotateCurrentOrTargetGate(-1);
-    });
-
-    this.input.keyboard.on('keydown-H', () => {
-      this.useHint();
-    });
-
-    this.input.keyboard.on('keydown-C', () => {
-      this.toggleCheatSheet();
-    });
-  }
-
-  private selectCell(row: number, col: number): void {
-    const cell = this.grid[row]?.[col];
-    if (!cell || cell.fixed || cell.locked || cell.type === GateType.SOURCE || cell.type === GateType.LED) {
-      return;
-    }
-    this.activeTargetCell = { row, col };
-    this.updateTargetHighlight();
-
-    const targetX = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
-    const targetY = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
-    if (this.player) {
-      this.player.setFlipX(targetX < this.player.x);
-      this.tweens.add({
-        targets: this.player,
-        x: targetX,
-        y: targetY,
-        duration: 120,
-        ease: 'Quad.easeOut',
-      });
-    }
-  }
-
-  private rotateCurrentOrTargetGate(direction: 1 | -1 = 1): void {
-    if (this.isWon || this.isTimeOver || this.isOutOfMoves) return;
-
-    if (!this.activeTargetCell) {
-      const closest = this.findClosestRotatableGate();
-      if (closest) {
-        this.selectCell(closest.row, closest.col);
-      }
-    }
-
-    if (this.activeTargetCell) {
-      const { row, col } = this.activeTargetCell;
-      this.handleCellTap(row, col, direction);
-    }
-  }
-
-  private findClosestRotatableGate(): { row: number; col: number } | null {
-    let bestDist = Infinity;
-    let bestCell: { row: number; col: number } | null = null;
-
-    for (let r = 0; r < this.gridHeight; r++) {
-      for (let c = 0; c < this.gridWidth; c++) {
-        const cell = this.grid[r][c];
-        if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
-          const cx = this.boardOffsetX + c * this.cellSize + this.cellSize / 2;
-          const cy = this.boardOffsetY + r * this.cellSize + this.cellSize / 2;
-          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, cx, cy);
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestCell = { row: r, col: c };
-          }
-        }
-      }
-    }
-
-    return bestCell;
-  }
-
-  private createSparkEffect(x: number, y: number, golden: boolean = false): void {
-    for (let i = 0; i < 12; i++) {
-      const spark = this.add.sprite(x, y, 'particle_spark');
-      spark.setDepth(60);
-      spark.setScale(Phaser.Math.FloatBetween(0.6, 1.4));
-      if (golden) {
-        spark.setTint(0xffd700);
-      }
-
-      const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-      const speed = Phaser.Math.Between(50, 160);
-
-      this.tweens.add({
-        targets: spark,
-        x: x + Math.cos(angle) * speed,
-        y: y + Math.sin(angle) * speed,
-        alpha: 0,
-        scale: 0.1,
-        duration: Phaser.Math.Between(260, 480),
-        onComplete: () => spark.destroy(),
-      });
-    }
-  }
-
-  private calculateExactMinMoves(grid: (GateDefinition | null)[][]): number {
-    let minMoves = 0;
-    for (let r = 0; r < this.gridHeight; r++) {
-      for (let c = 0; c < this.gridWidth; c++) {
-        const cell = grid[r]?.[c];
-        if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
-          if (cell.type === GateType.WIRE) {
-            if (cell.rotation % 2 !== cell.correctRotation % 2) {
-              minMoves += 1;
-            }
-          } else {
-            const diffCw = (cell.correctRotation - cell.rotation + 4) % 4;
-            const diffCcw = (cell.rotation - cell.correctRotation + 4) % 4;
-            minMoves += Math.min(diffCw, diffCcw);
-          }
-        }
-      }
-    }
-    return Math.max(minMoves, 2);
-  }
-
-  private updateMovesDisplay(): void {
-    if (!this.movesText) return;
-    const remaining = Math.max(0, this.maxMoves - this.movesCount);
-    let starColor = '#ffd000';
-    let starIcon = '⭐⭐⭐';
-
-    if (this.movesCount <= this.parMoves) {
-      starColor = '#ffd000';
-      starIcon = '⭐⭐⭐';
-    } else if (this.movesCount <= this.twoStarMoves) {
-      starColor = '#00f0ff';
-      starIcon = '⭐⭐☆';
-    } else if (this.movesCount <= this.maxMoves) {
-      starColor = '#ffaa44';
-      starIcon = '⭐☆☆';
-    }
-
-    const turnsWarning = remaining <= 3 ? ` ${i18n.t('moves_warning', { rem: remaining })}` : '';
-    this.movesText.setText(`${i18n.t('moves_label')}: ${this.movesCount}/${this.maxMoves} (${remaining} ${i18n.t('moves_rem_label')})${turnsWarning} | ${i18n.t('par_label')}: ${this.parMoves} ${starIcon}`);
-    this.movesText.setColor(remaining <= 3 ? '#ff3344' : starColor);
-  }
-
-  private spawnRotationIndicator(x: number, y: number, direction: 1 | -1): void {
-    const iconText = direction === 1 ? i18n.t('badge_rotate_right') : i18n.t('badge_rotate_left');
-    const iconColor = direction === 1 ? '#ffd000' : '#00f0ff';
-    const tag = this.add.text(x, y - 25, iconText, {
-      fontSize: '13px',
-      fontFamily: 'monospace',
-      fontStyle: 'bold',
-      color: iconColor,
-      backgroundColor: '#0a192f',
-      padding: { x: 5, y: 2 },
-    });
-    tag.setOrigin(0.5);
-    tag.setDepth(200);
-
-    this.tweens.add({
-      targets: tag,
-      y: y - 55,
-      alpha: 0,
-      duration: 400,
-      ease: 'Quad.easeOut',
-      onComplete: () => tag.destroy(),
-    });
-  }
-
-  private triggerOutOfMoves(): void {
-    if (this.isOutOfMoves || this.isWon) return;
-    this.isOutOfMoves = true;
-    audio.playFail();
-    this.cameras.main.shake(250, 0.012);
-    this.showToast(i18n.getLanguage() === 'vi' ? '🚫 HẾT LƯỢT XOAY! MẠCH CHƯA ĐẠT YÊU CẦU.' : '🚫 OUT OF MOVES! CIRCUIT INCOMPLETE.');
-    this.showOutOfMovesModal();
-  }
-
-  private showOutOfMovesModal(): void {
-    if (this.modalGroup) return;
-
-    const modal = this.add.container(0, 0);
-    modal.setDepth(2000);
-
-    const backdrop = this.add.rectangle(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      GAME_WIDTH,
-      GAME_HEIGHT,
-      0x000000,
-      0.85
-    );
-    backdrop.setInteractive(new Phaser.Geom.Rectangle(0, 0, GAME_WIDTH, GAME_HEIGHT), Phaser.Geom.Rectangle.Contains);
-    backdrop.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      pointer.event?.stopPropagation?.();
-    });
-
-    const py = GAME_HEIGHT / 2 - 20;
-    const panelW = 480;
-    const panelH = 380;
-
-    const panel = this.add.graphics();
-    panel.fillStyle(0x0e1b2e, 0.98);
-    panel.lineStyle(2, 0xff2a55, 1);
-    panel.fillRoundedRect(GAME_WIDTH / 2 - panelW / 2, py - panelH / 2, panelW, panelH, 16);
-    panel.strokeRoundedRect(GAME_WIDTH / 2 - panelW / 2, py - panelH / 2, panelW, panelH, 16);
-
-    const icon = this.add.text(GAME_WIDTH / 2, py - 120, '🚫', {
-      fontSize: '52px',
-    });
-    icon.setOrigin(0.5);
-
-    const title = this.add.text(GAME_WIDTH / 2, py - 55, i18n.t('out_of_moves_title'), {
-      fontSize: '24px',
-      fontFamily: 'monospace',
-      color: '#ff2a55',
-      fontStyle: 'bold',
-    });
-    title.setOrigin(0.5);
-
-    const info = this.add.text(
-      GAME_WIDTH / 2,
-      py + 10,
-      i18n.t('out_of_moves_desc', { moves: this.maxMoves, max: this.maxMoves, par: this.parMoves }),
-      {
-        fontSize: '13px',
-        fontFamily: 'monospace',
-        color: '#c0c8e0',
-        align: 'center',
-        lineSpacing: 6,
-      }
-    );
-    info.setOrigin(0.5);
-
-    const btnW = 340;
-    const btnH = 46;
-
-    const retryBtn = this.add.container(GAME_WIDTH / 2, py + 85);
-    const retryBg = this.add.graphics();
-    retryBg.fillStyle(0xff2a55, 1);
-    retryBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-    const retryText = this.add.text(0, 0, i18n.t('btn_retry'), {
-      fontSize: '15px',
-      fontFamily: 'monospace',
-      color: '#ffffff',
-      fontStyle: 'bold',
-    });
-    retryText.setOrigin(0.5);
-    retryBtn.add([retryBg, retryText]);
-
-    const retryZone = this.add.zone(0, 0, btnW, btnH);
-    retryZone.setInteractive({ useHandCursor: true });
-    retryZone.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.restartCurrentLevel();
-    });
-    retryBtn.add(retryZone);
-
-    const selectBtn = this.add.container(GAME_WIDTH / 2, py + 145);
-    const selectBg = this.add.graphics();
-    selectBg.fillStyle(0x162a45, 1);
-    selectBg.lineStyle(1.5, 0x00f0ff, 0.7);
-    selectBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-    selectBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-    const selectText = this.add.text(0, 0, i18n.t('btn_levels_list'), {
-      fontSize: '14px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
-      fontStyle: 'bold',
-    });
-    selectText.setOrigin(0.5);
-    selectBtn.add([selectBg, selectText]);
-
-    const selectZone = this.add.zone(0, 0, btnW, btnH);
-    selectZone.setInteractive({ useHandCursor: true });
-    selectZone.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.cleanupAndNavigate('LevelSelectScene');
-    });
-    selectBtn.add(selectZone);
-
-    modal.add([backdrop, panel, icon, title, info, retryBtn, selectBtn]);
-    this.modalGroup = modal;
-  }
-
-  private setupTouchControls(): void {
-    this.touchControls = new TouchControls(this);
-
-    // Long press on any cell to open logic gate cheat sheet
-    this.touchControls.setLongPressHandler((x: number, y: number) => {
-      const { row, col } = this.screenToGrid(x, y);
-      if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
-        this.toggleCheatSheet();
-      }
-    });
-  }
-
-  private screenToGrid(screenX: number, screenY: number): { row: number; col: number } {
-    const col = Math.floor((screenX - this.boardOffsetX - this.boardContainer.x) / (this.cellSize * this.boardScale));
-    const row = Math.floor((screenY - this.boardOffsetY - this.boardContainer.y) / (this.cellSize * this.boardScale));
-    return { row, col };
-  }
-
-  private handleCellTap(row: number, col: number, direction: 1 | -1 = 1): void {
-    const cell = this.grid[row][col];
-    if (!cell || cell.fixed || cell.locked || this.isAnimating || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
-
-    // Track Moves and update HUD
-    this.movesCount++;
-    this.updateMovesDisplay();
-
-    const targetX = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
-    const targetY = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
-
-    if (this.player) {
-      this.player.setFlipX(targetX < this.player.x);
-      this.tweens.add({
-        targets: this.player,
-        x: targetX,
-        y: targetY,
-        duration: 150,
-        ease: 'Quad.easeOut',
-      });
-    }
-
-    this.isAnimating = true;
-
-    // Apply rotation & sound
-    audio.playRotate(direction);
-    if (cell.type === GateType.WIRE) {
-      cell.rotation = (cell.rotation + 1) % 2;
-    } else {
-      if (direction === 1) {
-        cell.rotation = (cell.rotation + 1) % 4;
-      } else {
-        cell.rotation = (cell.rotation + 3) % 4;
-      }
-    }
-
-    // Spawn floating rotation indicator badge
-    this.spawnRotationIndicator(targetX, targetY, direction);
-    this.createSparkEffect(targetX, targetY);
-
-    const onCompleteRotation = () => {
-      this.drawGateInCell(row, col);
-      audio.playFlow();
-      this.propagateSignals();
-      this.isAnimating = false;
-
-      // Check Out of Moves: If not won and moves >= maxMoves, trigger Game Over!
-      if (!this.isWon && this.movesCount >= this.maxMoves && !this.isOutOfMoves) {
-        this.triggerOutOfMoves();
-      }
-    };
-
-    const sprite = this.cellSprites[row]?.[col];
-    if (sprite) {
-      this.tweens.add({
-        targets: sprite.container,
-        scaleX: 1.14,
-        scaleY: 1.14,
-        duration: ANIM.ROTATE_DURATION / 2,
-        yoyo: true,
-        ease: 'Sine.easeOut',
-        onComplete: onCompleteRotation,
-      });
-    } else {
-      onCompleteRotation();
-    }
+    this.selectedCell = { row: startR, col: startC };
+    this.activeHoveredCell = { row: startR, col: startC };
   }
 
   private propagateSignals(): void {
     this.signalEngine.updateGrid(this.grid);
     const states = this.signalEngine.propagate(this.sources);
 
-    // Update Short-Circuit Warnings
     this.updateShortCircuitVisuals();
 
-    // Update LEDs graphics
+    // Update LED sprites
     for (let r = 0; r < this.gridHeight; r++) {
       for (let c = 0; c < this.gridWidth; c++) {
         const state = states[r][c];
@@ -1913,8 +1768,8 @@ export class GameScene extends Phaser.Scene {
           const s = halfSize * 0.75;
 
           if (isSatisfied) {
-            sprite.gateGraphics.fillStyle(target === 1 ? COLORS.LED_GLOW : 0x00f5d4, 0.2);
-            sprite.gateGraphics.fillCircle(0, 0, s + 10);
+            sprite.gateGraphics.fillStyle(target === 1 ? COLORS.LED_GLOW : 0x00f5d4, 0.25);
+            sprite.gateGraphics.fillCircle(0, 0, s + 12);
             sprite.gateGraphics.fillStyle(target === 1 ? COLORS.LED_ON : 0x0096c7, 1);
             sprite.gateGraphics.lineStyle(2.5, target === 1 ? 0x00ff88 : 0x00f5d4, 1);
             sprite.gateGraphics.fillCircle(0, 0, s);
@@ -1926,7 +1781,6 @@ export class GameScene extends Phaser.Scene {
             sprite.gateGraphics.strokeCircle(0, 0, s);
           }
 
-          // Contact wire
           sprite.gateGraphics.lineStyle(3, isSatisfied ? COLORS.SIGNAL_ON : COLORS.SIGNAL_OFF, 1);
           sprite.gateGraphics.beginPath();
           sprite.gateGraphics.moveTo(-halfSize, 0);
@@ -1937,7 +1791,6 @@ export class GameScene extends Phaser.Scene {
           if (state && state.connected) {
             const halfSize = this.cellSize / 2 - 4;
             const isOne = state.outputSignal === 1;
-            // Draw output pin signal dot
             sprite.signalIndicator.fillStyle(isOne ? 0x00ff88 : 0x0088cc, 0.95);
             sprite.signalIndicator.lineStyle(1.5, 0xffffff, 0.9);
             sprite.signalIndicator.fillCircle(halfSize - 6, 0, 4);
@@ -1949,26 +1802,200 @@ export class GameScene extends Phaser.Scene {
 
     this.updateLedStatus();
 
-    // Check Win Condition:
-    // If multi-test-cases exist, evaluate all of them
+    // Check Win Condition
     let isWin = false;
     if (this.testCases && this.testCases.length > 0) {
       const res = this.signalEngine.evaluateAllTestCases(this.testCases);
       isWin = res.allPassed;
-      if (this.clockStatusText) {
-        const passedCount = res.results.filter(Boolean).length;
-        this.clockStatusText.setText(`⏱️ CHU KỲ: [${passedCount}/${this.testCases.length}] ${isWin ? '✅' : '⏳'}`);
-      }
     } else {
       isWin = this.signalEngine.checkWin(this.leds);
     }
 
     if (isWin && !this.isWon) {
       this.isWon = true;
-      this.updateLedStatus();
       this.celebrateWinAndShowModal();
     } else if (!isWin && !this.isWon && this.movesCount >= this.maxMoves && !this.isOutOfMoves) {
       this.triggerOutOfMoves();
+    }
+  }
+
+  private updateLedStatus(): void {
+    if (!this.ledStatusText) return;
+
+    let satisfied = 0;
+    const states = this.signalEngine.getCellStates();
+
+    for (const led of this.leds) {
+      const st = states[led.row]?.[led.col];
+      const target = led.targetSignal ?? 1;
+      if (st && st.connected && st.inputSignals.length > 0) {
+        if (target === 1 && st.inputSignals.includes(1)) {
+          satisfied++;
+        } else if (target === 0 && !st.inputSignals.includes(1)) {
+          satisfied++;
+        }
+      }
+    }
+
+    this.ledStatusText.setText(`${i18n.t('led_outputs')}: ${satisfied}/${this.leds.length}`);
+  }
+
+  private celebrateWinAndShowModal(): void {
+    crazyGames.happytime();
+    audio.playWin();
+
+    let starsCount = 1;
+    if (this.movesCount <= this.parMoves) {
+      starsCount = 3;
+    } else if (this.movesCount <= this.twoStarMoves) {
+      starsCount = 2;
+    }
+
+    const winData = {
+      levelId: this.levelId,
+      moves: this.movesCount,
+      parMoves: this.parMoves,
+      stars: starsCount,
+      isEndless: this.isEndless,
+    };
+
+    let timer: Phaser.Time.TimerEvent | null = this.time.delayedCall(ANIM.WIN_DELAY, () => {
+      timer = null;
+      this.cleanupAndNavigate('WinScene', winData);
+    });
+
+    const skipDirectlyToWin = () => {
+      if (timer) {
+        timer.remove();
+        timer = null;
+      }
+      this.cleanupAndNavigate('WinScene', winData);
+    };
+
+    this.input.keyboard?.once('keydown-ENTER', skipDirectlyToWin);
+    this.input.keyboard?.once('keydown-SPACE', skipDirectlyToWin);
+  }
+
+  private triggerOutOfMoves(): void {
+    this.isOutOfMoves = true;
+    audio.playFail();
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    const overlay = this.add.graphics();
+    overlay.fillStyle(0x000000, 0.85);
+    overlay.fillRect(0, 0, width, height);
+    overlay.setDepth(500);
+
+    const pw = Math.min(520, width - 40);
+    const ph = 320;
+    const px = (width - pw) / 2;
+    const py = (height - ph) / 2;
+
+    const modal = this.add.graphics();
+    modal.fillStyle(0x0e1b2e, 0.98);
+    modal.lineStyle(2, 0xff2a55, 0.95);
+    modal.fillRoundedRect(px, py, pw, ph, 14);
+    modal.strokeRoundedRect(px, py, pw, ph, 14);
+    modal.setDepth(501);
+
+    const title = this.add.text(width / 2, py + 34, i18n.t('out_of_moves_title'), {
+      fontSize: '22px',
+      fontFamily: FONTS.TITLE,
+      color: '#ff2a55',
+      fontStyle: 'bold',
+    });
+    title.setOrigin(0.5);
+    title.setDepth(502);
+
+    const desc = this.add.text(
+      width / 2,
+      py + 90,
+      i18n.t('out_of_moves_desc', {
+        moves: this.movesCount,
+        max: this.maxMoves,
+        par: this.parMoves,
+      }),
+      {
+        fontSize: '14px',
+        fontFamily: FONTS.UI,
+        color: '#d0e0f0',
+        align: 'center',
+        lineSpacing: 6,
+      }
+    );
+    desc.setOrigin(0.5, 0);
+    desc.setDepth(502);
+
+    // Retry Button
+    const retryBtn = this.createModalActionBtn(width / 2 - 95, py + ph - 48, 175, 40, `${i18n.t('btn_retry')} [ENTER]`, COLORS.SIGNAL_ON, () => {
+      this.restartCurrentLevel();
+    });
+    retryBtn.setDepth(503);
+
+    // Levels List Button
+    const levelsBtn = this.createModalActionBtn(width / 2 + 95, py + ph - 48, 175, 40, `${i18n.t('btn_levels_list')} [ESC]`, COLORS.CYBER_CYAN, () => {
+      this.cleanupAndNavigate('LevelSelectScene');
+    });
+    levelsBtn.setDepth(503);
+
+    const onRetryKey = () => {
+      this.restartCurrentLevel();
+    };
+    this.input.keyboard?.once('keydown-ENTER', onRetryKey);
+    this.input.keyboard?.once('keydown-SPACE', onRetryKey);
+    this.input.keyboard?.once('keydown-R', onRetryKey);
+  }
+
+  private createModalActionBtn(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    text: string,
+    strokeCol: number,
+    callback: () => void
+  ): Phaser.GameObjects.Container {
+    const container = this.add.container(x, y);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0e243c, 1);
+    bg.lineStyle(1.5, strokeCol, 0.9);
+    bg.fillRoundedRect(-w / 2, -h / 2, w, h, 6);
+    bg.strokeRoundedRect(-w / 2, -h / 2, w, h, 6);
+
+    const label = this.add.text(0, 0, text, {
+      fontSize: '13px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffffff',
+      fontStyle: 'bold',
+    });
+    label.setOrigin(0.5);
+
+    const hit = this.add.zone(0, 0, w, h);
+    hit.setInteractive({ useHandCursor: true });
+    hit.on('pointerdown', () => {
+      audio.playButtonClick();
+      callback();
+    });
+
+    container.add([bg, label, hit]);
+    return container;
+  }
+
+  private updateMovesDisplay(): void {
+    if (!this.movesText) return;
+    this.movesText.setText(`${i18n.t('moves_label')}: ${this.movesCount} / ${this.maxMoves}`);
+
+    let starsStr = '⭐⭐⭐';
+    if (this.movesCount > this.twoStarMoves) {
+      starsStr = '⭐☆☆';
+    } else if (this.movesCount > this.parMoves) {
+      starsStr = '⭐⭐☆';
+    }
+    if (this.starsPreviewText) {
+      this.starsPreviewText.setText(starsStr);
     }
   }
 
@@ -1993,7 +2020,6 @@ export class GameScene extends Phaser.Scene {
         this.shortCircuitGraphics.fillStyle(COLORS.SHORT_CIRCUIT_RED, 0.9);
         this.shortCircuitGraphics.fillCircle(midX, midY, 10);
       }
-
       this.showToast(i18n.t('toast_short_circuit'));
     }
   }
@@ -2044,341 +2070,245 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private celebrateWinAndShowModal(): void {
-    try {
-      audio.playWin();
-      let starsCount = 1;
-      if (this.movesCount <= this.parMoves) {
-        starsCount = 3;
-      } else if (this.movesCount <= this.twoStarMoves) {
-        starsCount = 2;
-      }
+  private updateTargetHighlight(): void {
+    if (!this.targetCellHighlight) return;
 
-      if (!this.isEndless) {
-        ProgressManager.unlockNextLevel(this.levelId);
-        ProgressManager.saveStars(this.levelId, starsCount);
-      } else {
-        const streak = ProgressManager.getEndlessStreak();
-        ProgressManager.saveEndlessStreak(Math.max(streak, this.levelId - 100));
-      }
+    this.targetCellHighlight.clear();
+    const target = this.activeHoveredCell || this.selectedCell;
+    if (!target || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
 
-      this.showNextLevelHudButton();
+    const { row, col } = target;
+    const x = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
+    const y = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
+    const half = this.cellSize / 2;
 
-      // Fireworks
-      const colors = [0x00ff88, 0x00f0ff, 0xff007f, 0xffd000, 0x8b00ff];
-      for (let burst = 0; burst < 3; burst++) {
-        this.time.delayedCall(burst * 180, () => {
-          try {
-            const bx = Phaser.Math.Between(100, GAME_WIDTH - 100);
-            const by = Phaser.Math.Between(220, GAME_HEIGHT - 380);
+    this.targetCellHighlight.lineStyle(2, COLORS.CYBER_CYAN, 0.95);
+    this.targetCellHighlight.strokeRoundedRect(x - half + 1, y - half + 1, this.cellSize - 2, this.cellSize - 2, 7);
 
-            for (let i = 0; i < 20; i++) {
-              const color = Phaser.Math.RND.pick(colors);
-              const colorRgba = Phaser.Display.Color.IntegerToColor(color).rgba;
-              const star = this.add.text(bx, by, '✦', {
-                fontSize: `${Phaser.Math.Between(14, 24)}px`,
-                color: colorRgba,
-              });
-              star.setOrigin(0.5);
-              star.setDepth(700);
+    // Corner brackets
+    const arm = Math.min(14, this.cellSize * 0.25);
+    this.targetCellHighlight.lineStyle(3, COLORS.CYBER_YELLOW, 1);
+    this.targetCellHighlight.beginPath();
+    this.targetCellHighlight.moveTo(x - half, y - half + arm);
+    this.targetCellHighlight.lineTo(x - half, y - half);
+    this.targetCellHighlight.lineTo(x - half + arm, y - half);
+    this.targetCellHighlight.strokePath();
 
-              const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-              const dist = Phaser.Math.Between(40, 180);
-
-              this.tweens.add({
-                targets: star,
-                x: bx + Math.cos(angle) * dist,
-                y: by + Math.sin(angle) * dist,
-                alpha: { from: 1, to: 0 },
-                scale: { from: 1.4, to: 0.2 },
-                duration: Phaser.Math.Between(600, 1100),
-                ease: 'Quad.easeOut',
-                onComplete: () => star.destroy(),
-              });
-            }
-          } catch (e) {}
-        });
-      }
-
-      this.time.delayedCall(ANIM.WIN_DELAY, () => {
-        this.openVictoryModal(starsCount);
-      });
-    } catch (err) {
-      console.warn('celebrateWin error:', err);
-    }
+    this.targetCellHighlight.beginPath();
+    this.targetCellHighlight.moveTo(x + half - arm, y - half);
+    this.targetCellHighlight.lineTo(x + half, y - half);
+    this.targetCellHighlight.lineTo(x + half, y - half + arm);
+    this.targetCellHighlight.strokePath();
   }
 
-  private showNextLevelHudButton(): void {
-    if (this.headerNextBtn) {
-      this.headerNextBtn.setVisible(true);
-      const txt = this.headerNextBtn.list[1] as Phaser.GameObjects.Text;
-      if (txt) {
-        txt.setText(this.isEndless ? i18n.t('btn_next_endless') : i18n.t('btn_next_level', { next: this.levelId + 1 }));
+  private useHint(): void {
+    if (this.availableHints <= 0 || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
+
+    let target: { r: number; c: number; correctRotation: number } | null = null;
+    for (let r = 0; r < this.gridHeight; r++) {
+      for (let c = 0; c < this.gridWidth; c++) {
+        const cell = this.grid[r][c];
+        if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
+          const mod = cell.type === GateType.WIRE || cell.type === GateType.CROSSOVER ? 2 : 4;
+          if (cell.rotation % mod !== cell.correctRotation % mod) {
+            target = { r, c, correctRotation: cell.correctRotation };
+            break;
+          }
+        }
       }
+      if (target) break;
     }
 
-    if (this.nextLevelHudContainer) return;
+    if (!target) {
+      this.showToast(i18n.t('toast_all_correct'));
+      return;
+    }
 
-    const hudY = GAME_HEIGHT - 230;
-    this.nextLevelHudContainer = this.add.container(GAME_WIDTH / 2, hudY);
-    this.nextLevelHudContainer.setDepth(750);
+    this.availableHints--;
+    if (this.hintBtnText) {
+      this.hintBtnText.setText(`💡 ${i18n.t('btn_hint')} (${this.availableHints})`);
+    }
 
-    const btnWidth = 320;
-    const btnHeight = 44;
+    audio.playHint();
+    const cell = this.grid[target.r][target.c]!;
+    cell.rotation = target.correctRotation;
+    cell.locked = true;
 
-    const btnBg = this.add.graphics();
-    btnBg.fillStyle(0x00ff88, 1);
-    btnBg.lineStyle(2, 0xffffff, 1);
-    btnBg.fillRoundedRect(-btnWidth / 2, -btnHeight / 2, btnWidth, btnHeight, 10);
-    btnBg.strokeRoundedRect(-btnWidth / 2, -btnHeight / 2, btnWidth, btnHeight, 10);
-
-    const btnLabel = this.add.text(
-      0,
-      0,
-      this.isEndless ? i18n.t('btn_next_endless') : i18n.t('btn_next_level', { next: this.levelId + 1 }),
-      {
-        fontSize: '16px',
-        fontFamily: 'monospace',
-        color: '#061a12',
-        fontStyle: 'bold',
-      }
-    );
-    btnLabel.setOrigin(0.5);
-
-    this.nextLevelHudContainer.add([btnBg, btnLabel]);
-
-    const zone = this.add.zone(0, 0, btnWidth, btnHeight);
-    zone.setInteractive({ useHandCursor: true });
-    zone.on('pointerdown', () => {
-      this.loadNextLevel(this.levelId + 1);
-    });
-    this.nextLevelHudContainer.add(zone);
-
-    this.tweens.add({
-      targets: this.nextLevelHudContainer,
-      scaleX: { from: 0.95, to: 1.05 },
-      scaleY: { from: 0.95, to: 1.05 },
-      duration: 600,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
+    this.drawGateInCell(target.r, target.c);
+    this.propagateSignals();
+    this.showToast(i18n.t('toast_hint_used'));
   }
 
-  private openVictoryModal(starsCount: number): void {
-    if (this.modalGroup) {
-      this.modalGroup.destroy();
-      this.modalGroup = null;
+  private toggleCheatSheet(): void {
+    if (this.cheatSheetGroup) {
+      this.cheatSheetGroup.destroy();
+      this.cheatSheetGroup = null;
+      return;
     }
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const isPort = OrientationManager.isPortrait(this);
 
     const container = this.add.container(0, 0);
-    container.setDepth(800);
+    container.setDepth(400);
 
     const overlay = this.add.graphics();
-    overlay.fillStyle(0x000000, 0.8);
-    overlay.fillRect(0, this.headerHeight, GAME_WIDTH, GAME_HEIGHT - this.headerHeight);
-    container.add(overlay);
+    overlay.fillStyle(0x000000, 0.85);
+    overlay.fillRect(0, 0, width, height);
+    overlay.setInteractive(new Phaser.Geom.Rectangle(0, 0, width, height), Phaser.Geom.Rectangle.Contains);
+    overlay.on('pointerdown', () => this.toggleCheatSheet());
 
-    const pw = 580;
-    const ph = 520;
-    const px = (GAME_WIDTH - pw) / 2;
-    const py = (GAME_HEIGHT - ph) / 2 - 20;
+    const pw = Math.min(720, width - 30);
+    const ph = Math.min(600, height - 60);
+    const px = (width - pw) / 2;
+    const py = (height - ph) / 2;
 
     const panel = this.add.graphics();
-    panel.fillStyle(0x0a1d35, 0.98);
-    panel.lineStyle(2.5, COLORS.SIGNAL_ON, 1);
-    panel.fillRoundedRect(px, py, pw, ph, 16);
-    panel.strokeRoundedRect(px, py, pw, ph, 16);
-    container.add(panel);
+    panel.fillStyle(0x0a1c32, 0.98);
+    panel.lineStyle(2, COLORS.CYBER_CYAN, 0.9);
+    panel.fillRoundedRect(px, py, pw, ph, 14);
+    panel.strokeRoundedRect(px, py, pw, ph, 14);
 
-    const closeBtn = this.add.text(px + pw - 28, py + 26, '✕', {
-      fontSize: '22px',
-      fontFamily: 'monospace',
-      color: '#88aacc',
-      fontStyle: 'bold',
-    });
-    closeBtn.setOrigin(0.5);
-    closeBtn.setInteractive({ useHandCursor: true });
-    closeBtn.on('pointerdown', () => {
-      if (this.modalGroup) {
-        this.modalGroup.destroy();
-        this.modalGroup = null;
-      }
-    });
-    container.add(closeBtn);
-
-    const trophy = this.add.text(GAME_WIDTH / 2, py + 48, '🎉', { fontSize: '48px' });
-    trophy.setOrigin(0.5);
-
-    const winTitle = this.isEndless
-      ? i18n.t('win_endless_title', { level: this.levelId - 100 })
-      : i18n.t('win_title', { level: this.levelId });
-    const title = this.add.text(GAME_WIDTH / 2, py + 104, winTitle, {
-      fontSize: '24px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
+    const title = this.add.text(width / 2, py + 26, i18n.t('cheat_sheet_title'), {
+      fontSize: isPort ? '18px' : '22px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
       fontStyle: 'bold',
     });
     title.setOrigin(0.5);
 
-    const starIcons = starsCount === 3 ? '⭐⭐⭐' : starsCount === 2 ? '⭐⭐☆' : '⭐☆☆';
-    const starsText = this.add.text(GAME_WIDTH / 2, py + 145, starIcons, { fontSize: '34px' });
-    starsText.setOrigin(0.5);
+    const cheatItems = [
+      { name: i18n.t('cheat_not_name'), rule: i18n.t('cheat_not_desc'), color: '#00f0ff' },
+      { name: i18n.t('cheat_and_name'), rule: i18n.t('cheat_and_desc'), color: '#ffd000' },
+      { name: i18n.t('cheat_nand_name'), rule: i18n.t('cheat_nand_desc'), color: '#ffb703' },
+      { name: i18n.t('cheat_or_name'), rule: i18n.t('cheat_or_desc'), color: '#00ff88' },
+      { name: i18n.t('cheat_nor_name'), rule: i18n.t('cheat_nor_desc'), color: '#06d6a0' },
+      { name: i18n.t('cheat_xor_name'), rule: i18n.t('cheat_xor_desc'), color: '#ff007f' },
+      { name: i18n.t('cheat_xnor_name'), rule: i18n.t('cheat_xnor_desc'), color: '#b5179e' },
+      { name: i18n.t('cheat_diode_name'), rule: i18n.t('cheat_diode_desc'), color: '#00f5d4' },
+      { name: i18n.t('cheat_bridge_name'), rule: i18n.t('cheat_bridge_desc'), color: '#4cc9f0' },
+    ];
 
-    const ratingText = starsCount === 3 ? i18n.t('rating_3_stars') : starsCount === 2 ? i18n.t('rating_2_stars') : i18n.t('rating_1_star');
-    const statsText = this.add.text(
-      GAME_WIDTH / 2,
-      py + 195,
-      `${i18n.t('win_moves_stat', { moves: this.movesCount, max: this.maxMoves, par: this.parMoves })}\n${ratingText}`,
-      {
-        fontSize: '13px',
-        fontFamily: 'monospace',
-        color: '#00f0ff',
-        align: 'center',
-        lineSpacing: 6,
-      }
-    );
-    statsText.setOrigin(0.5);
-
-    // Modal Action Buttons
-    const btnW = 380;
-    const btnH = 46;
-
-    // Button 1: Next Level
-    const nextBtnContainer = this.add.container(GAME_WIDTH / 2, py + 265);
-    const nextBg = this.add.graphics();
-    nextBg.fillStyle(0x00ff88, 1);
-    nextBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    const nextText = this.add.text(
-      0,
-      0,
-      this.isEndless
-        ? i18n.t('btn_next_endless')
-        : i18n.t('btn_continue_next', { next: this.levelId + 1 }),
-      {
-        fontSize: '15px',
-        fontFamily: 'monospace',
-        color: '#05111f',
+    cheatItems.forEach((item, idx) => {
+      const itemY = py + (isPort ? 56 : 66) + idx * (isPort ? 42 : 48);
+      const nm = this.add.text(px + (isPort ? 20 : 36), itemY, item.name, {
+        fontSize: isPort ? '13px' : '15px',
+        fontFamily: FONTS.TITLE,
+        color: item.color,
         fontStyle: 'bold',
-      }
-    );
-    nextText.setOrigin(0.5);
-    nextBtnContainer.add([nextBg, nextText]);
-
-    const nextZone = this.add.zone(0, 0, btnW, btnH);
-    nextZone.setInteractive({ useHandCursor: true });
-    nextZone.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.loadNextLevel(this.levelId + 1);
+      });
+      const rl = this.add.text(px + (isPort ? 160 : 230), itemY + 1, item.rule, {
+        fontSize: isPort ? '12px' : '14px',
+        fontFamily: FONTS.UI,
+        color: '#e0efff',
+      });
+      container.add([nm, rl]);
     });
-    nextBtnContainer.add(nextZone);
 
-    // Button 2: Replay
-    const replayBtnContainer = this.add.container(GAME_WIDTH / 2, py + 325);
-    const replayBg = this.add.graphics();
-    replayBg.fillStyle(0x112740, 1);
-    replayBg.lineStyle(1.5, 0x00a8cc, 0.9);
-    replayBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    replayBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    const replayText = this.add.text(0, 0, i18n.t('btn_replay'), {
-      fontSize: '14px',
-      fontFamily: 'monospace',
-      color: '#00f0ff',
+    const closeLabel = this.add.text(width / 2, py + ph - 24, i18n.t('btn_close'), {
+      fontSize: '15px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffd000',
       fontStyle: 'bold',
     });
-    replayText.setOrigin(0.5);
-    replayBtnContainer.add([replayBg, replayText]);
+    closeLabel.setOrigin(0.5);
 
-    const replayZone = this.add.zone(0, 0, btnW, btnH);
-    replayZone.setInteractive({ useHandCursor: true });
-    replayZone.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.restartCurrentLevel();
-    });
-    replayBtnContainer.add(replayZone);
-
-    // Button 3: Choose Level
-    const selectBtnContainer = this.add.container(GAME_WIDTH / 2, py + 385);
-    const selectBg = this.add.graphics();
-    selectBg.fillStyle(0x112740, 1);
-    selectBg.lineStyle(1.5, 0x8888cc, 0.7);
-    selectBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    selectBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
-    const selectText = this.add.text(0, 0, i18n.t('btn_levels_list'), {
-      fontSize: '14px',
-      fontFamily: 'monospace',
-      color: '#c0c8e0',
-      fontStyle: 'bold',
-    });
-    selectText.setOrigin(0.5);
-    selectBtnContainer.add([selectBg, selectText]);
-
-    const selectZone = this.add.zone(0, 0, btnW, btnH);
-    selectZone.setInteractive({ useHandCursor: true });
-    selectZone.on('pointerdown', () => {
-      audio.playButtonClick();
-      this.cleanupAndNavigate('LevelSelectScene');
-    });
-    selectBtnContainer.add(selectZone);
-
-    container.add([
-      trophy,
-      title,
-      starsText,
-      statsText,
-      nextBtnContainer,
-      replayBtnContainer,
-      selectBtnContainer,
-    ]);
-
-    this.modalGroup = container;
+    container.add([overlay, panel, title, closeLabel]);
+    this.cheatSheetGroup = container;
   }
 
-  private loadNextLevel(nextLevelId: number): void {
-    this.cleanupInputHandlers();
-    this.cameras.main.resetFX();
-    this.cameras.main.setAlpha(1);
+  private showToast(message: string): void {
+    const width = this.scale.width;
+    const isPort = OrientationManager.isPortrait(this);
+    const toast = this.add.container(width / 2, isPort ? 140 : 90);
+    toast.setDepth(300);
 
-    if (this.isEndless) {
-      this.scene.start('GameScene', { levelId: nextLevelId, isEndless: true });
-    } else if (nextLevelId > MAX_LEVELS) {
-      this.scene.start('LevelSelectScene');
-    } else {
-      this.scene.start('GameScene', { levelId: nextLevelId });
+    const text = this.add.text(0, 0, message, {
+      fontSize: '14px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffffff',
+      backgroundColor: '#071526',
+      padding: { x: 16, y: 8 },
+    });
+    text.setOrigin(0.5);
+
+    toast.add(text);
+
+    this.tweens.add({
+      targets: toast,
+      y: isPort ? 160 : 110,
+      alpha: { from: 1, to: 0 },
+      duration: 2200,
+      ease: 'Quad.easeOut',
+      onComplete: () => toast.destroy(),
+    });
+  }
+
+  private updateTimerBar(): void {
+    if (!this.timerBarGraphics) return;
+
+    const width = this.scale.width;
+    this.timerBarGraphics.clear();
+    const ratio = Math.max(0, this.timeRemaining / this.totalTimeLimit);
+
+    this.timerBarGraphics.fillStyle(0x112233, 1);
+    this.timerBarGraphics.fillRect(0, 0, width, 4);
+
+    let barColor = COLORS.SIGNAL_ON;
+    if (this.timeRemaining <= 15) {
+      barColor = 0xff0055;
+    } else if (ratio < 0.4) {
+      barColor = COLORS.CYBER_YELLOW;
     }
+
+    this.timerBarGraphics.fillStyle(barColor, 1);
+    this.timerBarGraphics.fillRect(0, 0, width * ratio, 4);
+  }
+
+  private formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    const mStr = mins < 10 ? `0${mins}` : `${mins}`;
+    const sStr = secs < 10 ? `0${secs}` : `${secs}`;
+    return `⏱️ ${mStr}:${sStr}`;
   }
 
   private restartCurrentLevel(): void {
-    this.cleanupInputHandlers();
-    this.cameras.main.resetFX();
-    this.cameras.main.setAlpha(1);
-    this.scene.start('GameScene', {
+    this.cleanupAndNavigate('GameScene', {
       levelId: this.levelId,
       isEndless: this.isEndless,
     });
   }
 
-  private cleanupAndNavigate(sceneKey: string): void {
-    this.cleanupInputHandlers();
-    this.cameras.main.resetFX();
-    this.cameras.main.setAlpha(1);
-    this.scene.start(sceneKey);
-  }
-
-  private cleanupInputHandlers(): void {
-    if (this.virtualJoystick) {
-      this.virtualJoystick.destroy();
-    }
-    if (this.touchControls) {
-      this.touchControls.destroy();
-    }
-    this.input.off('pointerdown');
-    this.input.off('pointermove');
-    this.input.off('pointerup');
-    this.input.off('wheel');
+  private cleanupAndNavigate(sceneKey: string, data?: any): void {
+    crazyGames.gameplayStop();
     if (this.input.keyboard) {
       this.input.keyboard.removeAllListeners();
     }
+    this.cameras.main.resetFX();
+    this.scene.start(sceneKey, data);
+  }
+
+  private calculateExactMinMoves(cells: (GateDefinition | null)[][]): number {
+    let minMoves = 0;
+    for (let r = 0; r < this.gridHeight; r++) {
+      for (let c = 0; c < this.gridWidth; c++) {
+        const cell = cells[r]?.[c];
+        if (cell && !cell.fixed && !cell.locked && cell.type !== GateType.SOURCE && cell.type !== GateType.LED) {
+          if (cell.type === GateType.WIRE || cell.type === GateType.CROSSOVER) {
+            if (cell.rotation % 2 !== cell.correctRotation % 2) {
+              minMoves += 1;
+            }
+          } else {
+            const diffCw = (cell.correctRotation - cell.rotation + 4) % 4;
+            const diffCcw = (cell.rotation - cell.correctRotation + 4) % 4;
+            minMoves += Math.min(diffCw, diffCcw);
+          }
+        }
+      }
+    }
+    return Math.max(minMoves, 1);
   }
 
   update(_time: number, delta: number): void {
@@ -2390,34 +2320,30 @@ export class GameScene extends Phaser.Scene {
       if (this.timeRemaining <= 0) {
         this.timeRemaining = 0;
         this.isTimeOver = true;
-        this.showToast('⏱️ HẾT GIỜ! HÃY BẤM LÀM LẠI ĐỂ THỬ LẠI.');
+        this.showToast(i18n.t('toast_timeout'));
       }
       this.timerText.setText(this.formatTime(this.timeRemaining));
       this.updateTimerBar();
     }
 
-    // Joystick and Player movement
-    if (this.player && this.virtualJoystick) {
-      const joy = this.virtualJoystick.getValue();
-      let vx = joy.x;
-      let vy = joy.y;
+    // Arrow keys & WASD player movement
+    if (this.player && (this.cursors || this.wasdKeys) && !this.isWon && !this.isTimeOver && !this.isOutOfMoves) {
+      let vx = 0;
+      let vy = 0;
 
-      // Keyboard overrides
-      if (this.cursors || this.keys) {
-        if (this.cursors?.left.isDown || this.keys?.a.isDown) vx = -1;
-        if (this.cursors?.right.isDown || this.keys?.d.isDown) vx = 1;
-        if (this.cursors?.up.isDown || this.keys?.w.isDown) vy = -1;
-        if (this.cursors?.down.isDown || this.keys?.s.isDown) vy = 1;
-      }
+      if (this.cursors?.left.isDown || this.wasdKeys?.A.isDown) vx -= 1;
+      if (this.cursors?.right.isDown || this.wasdKeys?.D.isDown) vx += 1;
+      if (this.cursors?.up.isDown || this.wasdKeys?.W.isDown) vy -= 1;
+      if (this.cursors?.down.isDown || this.wasdKeys?.S.isDown) vy += 1;
 
       if (vx !== 0 || vy !== 0) {
         const len = Math.hypot(vx, vy);
         const normX = vx / len;
         const normY = vy / len;
 
-        const moveSpeed = (this.playerSpeed * delta) / 1000;
-        this.player.x += normX * moveSpeed;
-        this.player.y += normY * moveSpeed;
+        const moveDist = (this.playerSpeed * delta) / 1000;
+        this.player.x += normX * moveDist;
+        this.player.y += normY * moveDist;
 
         if (vx !== 0) {
           this.player.setFlipX(vx < 0);
@@ -2432,68 +2358,23 @@ export class GameScene extends Phaser.Scene {
         this.player.x = Phaser.Math.Clamp(this.player.x, minX, maxX);
         this.player.y = Phaser.Math.Clamp(this.player.y, minY, maxY);
 
-        // Update active target cell
-        this.activeTargetCell = this.findClosestRotatableGate();
+        // Select the cell under the player
+        const col = Math.floor((this.player.x - this.boardOffsetX) / this.cellSize);
+        const row = Math.floor((this.player.y - this.boardOffsetY) / this.cellSize);
+
+        if (row >= 0 && row < this.gridHeight && col >= 0 && col < this.gridWidth) {
+          const cell = this.grid[row]?.[col];
+          if (cell && (this.selectedCell?.row !== row || this.selectedCell?.col !== col)) {
+            this.selectedCell = { row, col };
+            this.activeHoveredCell = { row, col };
+            this.renderGateInspector(cell, row, col);
+          }
+        }
       }
     }
 
-    // Highlight target cell under or closest to player
+    // Update target reticle & electric pulses
     this.updateTargetHighlight();
-
-    // Pulse animation on active wires
     this.updateElectricPulseEffect();
-  }
-
-  private updateTargetHighlight(): void {
-    if (!this.targetCellHighlight) return;
-
-    this.targetCellHighlight.clear();
-    if (!this.activeTargetCell || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
-
-    const { row, col } = this.activeTargetCell;
-    const x = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
-    const y = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
-    const half = this.cellSize / 2;
-
-    // Glowing Cyberpunk Outer Box
-    this.targetCellHighlight.lineStyle(2.5, 0x00f0ff, 0.95);
-    this.targetCellHighlight.strokeRoundedRect(x - half + 1, y - half + 1, this.cellSize - 2, this.cellSize - 2, 8);
-
-    // Left half indicator tint: Subtle cyan glow for Left Rotation ↺
-    this.targetCellHighlight.fillStyle(0x00f0ff, 0.09);
-    this.targetCellHighlight.fillRect(x - half + 3, y - half + 3, half - 3, this.cellSize - 6);
-
-    // Right half indicator tint: Subtle yellow glow for Right Rotation ↻
-    this.targetCellHighlight.fillStyle(0xffd000, 0.09);
-    this.targetCellHighlight.fillRect(x, y - half + 3, half - 3, this.cellSize - 6);
-
-    // Center divider line
-    this.targetCellHighlight.lineStyle(1.5, 0x3a5a7a, 0.7);
-    this.targetCellHighlight.beginPath();
-    this.targetCellHighlight.moveTo(x, y - half + 4);
-    this.targetCellHighlight.lineTo(x, y + half - 4);
-    this.targetCellHighlight.strokePath();
-
-    // Corner accents
-    const arm = Math.min(16, this.cellSize * 0.25);
-    this.targetCellHighlight.lineStyle(3, 0xffd000, 1);
-    // Top-Left
-    this.targetCellHighlight.beginPath();
-    this.targetCellHighlight.moveTo(x - half, y - half + arm);
-    this.targetCellHighlight.lineTo(x - half, y - half);
-    this.targetCellHighlight.lineTo(x - half + arm, y - half);
-    // Top-Right
-    this.targetCellHighlight.moveTo(x + half - arm, y - half);
-    this.targetCellHighlight.lineTo(x + half, y - half);
-    this.targetCellHighlight.lineTo(x + half, y - half + arm);
-    // Bottom-Left
-    this.targetCellHighlight.moveTo(x - half, y + half - arm);
-    this.targetCellHighlight.lineTo(x - half, y + half);
-    this.targetCellHighlight.lineTo(x - half + arm, y + half);
-    // Bottom-Right
-    this.targetCellHighlight.moveTo(x + half - arm, y + half);
-    this.targetCellHighlight.lineTo(x + half, y + half);
-    this.targetCellHighlight.lineTo(x + half, y + half - arm);
-    this.targetCellHighlight.strokePath();
   }
 }

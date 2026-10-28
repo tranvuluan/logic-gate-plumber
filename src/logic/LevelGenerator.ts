@@ -49,45 +49,75 @@ export function generateEndlessLevel(levelNum: number): LevelDefinition {
     return (s - 1) / 2147483646;
   };
 
-  const W = 8 + Math.floor(rng() * 3); // 8 to 10
-  const H = W;
+  const W = 8;
+  const H = 8;
   const gatePool: GateType[] = [
     GateType.AND, GateType.OR, GateType.XOR,
     GateType.NAND, GateType.NOR, GateType.XNOR,
-    GateType.DIODE, GateType.NOT
   ];
 
   const placements: { r: number; c: number; type: GateType; rotation: number; correctRotation: number; fixed: boolean }[] = [];
   const sources: { row: number; col: number; value: number }[] = [];
   const leds: { row: number; col: number; targetSignal?: number }[] = [];
 
-  const tracks = Math.min(4, Math.floor(H / 2));
-  for (let t = 0; t < tracks; t++) {
-    const tr = 1 + t * 2;
+  // 2 completely independent tracks on 8x8 grid (Track 0 uses R0, R1, R2; Track 1 uses R3, R4, R5)
+  const trackCenters = [1, 4];
+  for (let t = 0; t < trackCenters.length; t++) {
+    const tr = trackCenters[t];
     const topRow = tr - 1;
     const botRow = tr + 1;
     if (botRow >= H) break;
 
-    const s1 = rng() > 0.5 ? 1 : 0;
-    const s2 = rng() > 0.5 ? 1 : 0;
+    const s1 = rng() > 0.45 ? 1 : 0;
+    const s2 = rng() > 0.45 ? 1 : 0;
+
+    // Sources at col 0
     sources.push({ row: topRow, col: 0, value: s1 });
     sources.push({ row: botRow, col: 0, value: s2 });
     placements.push({ r: topRow, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true });
     placements.push({ r: botRow, c: 0, type: GateType.SOURCE, rotation: 0, correctRotation: 0, fixed: true });
 
-    const chosenGate = gatePool[Math.floor(rng() * gatePool.length)];
-    const target = (rng() > 0.6) ? 0 : 1;
-    leds.push({ row: tr, col: W - 1, targetSignal: target });
-    placements.push({ r: tr, c: W - 1, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true });
+    // Straight wires from col 1 to col 2
+    placements.push({ r: topRow, c: 1, type: GateType.WIRE, rotation: Math.floor(rng() * 2), correctRotation: 0, fixed: false });
+    placements.push({ r: botRow, c: 1, type: GateType.WIRE, rotation: Math.floor(rng() * 2), correctRotation: 0, fixed: false });
 
-    placements.push({ r: topRow, c: 1, type: GateType.WIRE_CORNER, rotation: Math.floor(rng() * 4), correctRotation: 0, fixed: false });
-    placements.push({ r: botRow, c: 1, type: GateType.WIRE_CORNER, rotation: Math.floor(rng() * 4), correctRotation: 1, fixed: false });
+    // Corner wires at col 2: route inputs directly into the gate at (tr, 2)!
+    // Top corner (r: topRow, c: 2): connects LEFT (c: 1) and DOWN (into tr, 2) -> correctRotation: 0
+    placements.push({ r: topRow, c: 2, type: GateType.WIRE_CORNER, rotation: Math.floor(rng() * 4), correctRotation: 0, fixed: false });
+    // Bottom corner (r: botRow, c: 2): connects LEFT (c: 1) and UP (into tr, 2) -> correctRotation: 1
+    placements.push({ r: botRow, c: 2, type: GateType.WIRE_CORNER, rotation: Math.floor(rng() * 4), correctRotation: 1, fixed: false });
+
+    // Logic gate at (tr, 2): receives input from UP and DOWN, outputs to RIGHT!
+    const chosenGate = gatePool[Math.floor(rng() * gatePool.length)];
     placements.push({ r: tr, c: 2, type: chosenGate, rotation: Math.floor(rng() * 4), correctRotation: 0, fixed: false });
 
+    // Determine expected gate output
+    let expectedOut = 0;
+    switch (chosenGate) {
+      case GateType.AND: expectedOut = (s1 === 1 && s2 === 1) ? 1 : 0; break;
+      case GateType.OR: expectedOut = (s1 === 1 || s2 === 1) ? 1 : 0; break;
+      case GateType.XOR: expectedOut = (s1 !== s2) ? 1 : 0; break;
+      case GateType.NAND: expectedOut = (s1 === 1 && s2 === 1) ? 0 : 1; break;
+      case GateType.NOR: expectedOut = (s1 === 0 && s2 === 0) ? 1 : 0; break;
+      case GateType.XNOR: expectedOut = (s1 === s2) ? 1 : 0; break;
+    }
+
+    // Straight wires carrying output from col 3 to col W - 2
     for (let c = 3; c < W - 1; c++) {
       const isFixed = c === 4;
-      placements.push({ r: tr, c, type: GateType.WIRE, rotation: isFixed ? 0 : Math.floor(rng() * 2), correctRotation: 0, fixed: isFixed });
+      placements.push({
+        r: tr,
+        c,
+        type: GateType.WIRE,
+        rotation: isFixed ? 0 : Math.floor(rng() * 2),
+        correctRotation: 0,
+        fixed: isFixed,
+      });
     }
+
+    // Target LED at col W - 1 with target matching expected output!
+    leds.push({ row: tr, col: W - 1, targetSignal: expectedOut });
+    placements.push({ r: tr, c: W - 1, type: GateType.LED, rotation: 0, correctRotation: 0, fixed: true });
   }
 
   const cells = createGrid(H, W, placements);

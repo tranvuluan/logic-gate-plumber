@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GateType, COLORS, CELL_SIZE, GAME_WIDTH } from '../utils/Constants';
+import { GateType, COLORS, CELL_SIZE } from '../utils/Constants';
 
 /**
  * ProceduralGraphics - Generates all game graphics in Cyberpunk / High-Tech PCB style.
@@ -1024,13 +1024,14 @@ export class ProceduralGraphics {
     }
 
     // High-tech PCB bus traces with solder vias
-    g.lineStyle(1.5, COLORS.CYBER_CYAN, 0.12);
+    g.lineStyle(1.5, COLORS.CYBER_CYAN, 0.18);
     const tracePaths = [
-      [30, 150, 180, 150, 240, 210, 480, 210],
-      [GAME_WIDTH - 30, 280, 520, 280, 460, 340, 300, 340],
-      [60, 850, 200, 850, 260, 910, 450, 910],
-      [GAME_WIDTH - 50, 960, 420, 960, 360, 1020, 100, 1020],
-      [50, 1150, 220, 1150, 280, 1210, 500, 1210],
+      [40, 80, 260, 80, 320, 140, 500, 140],
+      [width - 40, 100, width - 240, 100, width - 300, 160, width - 460, 160],
+      [60, height - 120, 240, height - 120, 300, height - 60, 560, height - 60],
+      [width - 60, height - 140, width - 220, height - 140, width - 280, height - 80, width - 480, height - 80],
+      [80, 360, 180, 360, 240, 420, 320, 420],
+      [width - 80, 380, width - 200, 380, width - 260, 320, width - 360, 320],
     ];
 
     for (const path of tracePaths) {

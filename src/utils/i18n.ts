@@ -43,6 +43,10 @@ export interface Translations {
   toast_all_correct: string;
   toast_hint_used: string;
   toast_short_circuit: string;
+  toast_timeout: string;
+  controls_guide_desktop: string;
+  truth_table_title: string;
+  gate_inspector_title: string;
 
   // Out of Moves Modal
   out_of_moves_title: string;
@@ -139,6 +143,10 @@ const DICTIONARY: Record<Language, Translations> = {
     toast_all_correct: '✅ Mọi cổng đã đúng chiều!',
     toast_hint_used: '✨ Đã sửa đúng & khóa 1 cổng!',
     toast_short_circuit: '⚡ CẢNH BÁO: ĐOẢN MẠCH! HÃY TÁCH NGÕ RA!',
+    toast_timeout: '⏱️ HẾT GIỜ! HÃY BẤM LÀM LẠI ĐỂ THỬ LẠI.',
+    controls_guide_desktop: 'Chuột Trái: Xoay Phải (↻) | Chuột Phải: Xoay Trái (↺) | Phím Q/E',
+    truth_table_title: 'BẢNG CHÂN TRỊ TRỰC TIẾP',
+    gate_inspector_title: 'CHI TIẾT CỔNG LOGIC',
 
     out_of_moves_title: 'HẾT LƯỢT XOAY!',
     out_of_moves_desc:
@@ -231,6 +239,10 @@ const DICTIONARY: Record<Language, Translations> = {
     toast_all_correct: '✅ All gates are in correct positions!',
     toast_hint_used: '✨ Solved and locked 1 gate!',
     toast_short_circuit: '⚡ WARNING: SHORT CIRCUIT! SEPARATE OUTPUTS!',
+    toast_timeout: '⏱️ TIME IS UP! Click Retry to try again.',
+    controls_guide_desktop: 'Left Click: Rotate CW (↻) | Right Click: CCW (↺) | Q / E Keys',
+    truth_table_title: 'LIVE TRUTH TABLE',
+    gate_inspector_title: 'GATE INSPECTOR',
 
     out_of_moves_title: 'OUT OF MOVES!',
     out_of_moves_desc:
@@ -274,7 +286,7 @@ const DICTIONARY: Record<Language, Translations> = {
 const STORAGE_KEY = 'logic_gate_language';
 
 class I18nManager {
-  private currentLang: Language = 'vi';
+  private currentLang: Language = 'en';
 
   constructor() {
     try {
@@ -282,11 +294,12 @@ class I18nManager {
       if (saved === 'vi' || saved === 'en') {
         this.currentLang = saved;
       } else {
-        const sysLang = navigator.language || '';
-        this.currentLang = sysLang.toLowerCase().startsWith('vi') ? 'vi' : 'en';
+        const sysLang = (navigator.language || '').toLowerCase();
+        // Default to English for international portals (CrazyGames), unless explicitly Vietnamese locale
+        this.currentLang = sysLang.startsWith('vi') ? 'vi' : 'en';
       }
     } catch {
-      this.currentLang = 'vi';
+      this.currentLang = 'en';
     }
   }
 

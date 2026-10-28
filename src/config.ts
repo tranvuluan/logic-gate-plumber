@@ -1,10 +1,21 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from './utils/Constants';
+import {
+  LANDSCAPE_WIDTH,
+  LANDSCAPE_HEIGHT,
+  PORTRAIT_WIDTH,
+  PORTRAIT_HEIGHT,
+  COLORS,
+} from './utils/Constants';
 import { BootScene } from './scenes/BootScene';
 import { MenuScene } from './scenes/MenuScene';
 import { GameScene } from './scenes/GameScene';
 import { LevelSelectScene } from './scenes/LevelSelectScene';
 import { WinScene } from './scenes/WinScene';
+
+const isInitialPortrait =
+  typeof window !== 'undefined' && window.innerHeight > window.innerWidth;
+const initialWidth = isInitialPortrait ? PORTRAIT_WIDTH : LANDSCAPE_WIDTH;
+const initialHeight = isInitialPortrait ? PORTRAIT_HEIGHT : LANDSCAPE_HEIGHT;
 
 export const gameConfig: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -13,16 +24,8 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: GAME_WIDTH,
-    height: GAME_HEIGHT,
-    min: {
-      width: 360,
-      height: 640,
-    },
-    max: {
-      width: 1080,
-      height: 1920,
-    },
+    width: initialWidth,
+    height: initialHeight,
   },
   scene: [BootScene, MenuScene, LevelSelectScene, GameScene, WinScene],
   physics: {
@@ -33,7 +36,7 @@ export const gameConfig: Phaser.Types.Core.GameConfig = {
     },
   },
   input: {
-    activePointers: 2, // Support multi-touch
+    activePointers: 2,
   },
   render: {
     antialias: true,

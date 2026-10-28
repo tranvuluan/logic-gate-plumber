@@ -1,24 +1,32 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   
-  <!-- PWA & Mobile Fullscreen Meta Tags -->
+  <!-- CrazyGames SDK v3 -->
+  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
+
+  <!-- Google Fonts: Orbitron & Rajdhani for Cyberpunk Polish -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Web App & Mobile Meta Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Gate Plumber" />
+  <meta name="apple-mobile-web-app-title" content="Logic Gate Plumber" />
   <meta name="application-name" content="Logic Gate Plumber" />
-  <meta name="theme-color" content="#070e1b" />
-  <meta name="description" content="Logic Gate Plumber - Game giải đố xoay cổng logic số trên di động" />
+  <meta name="theme-color" content="#060c18" />
+  <meta name="description" content="Logic Gate Plumber - High-tech cyberpunk digital circuit puzzle game. Rotate logic gates and connect electrical power!" />
 
   <!-- App Icons & Manifest -->
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
 
-  <title>Logic Gate Plumber - Nối Mạch Kỹ Thuật Số</title>
+  <title>Logic Gate Plumber - Cyberpunk Circuit Puzzle</title>
   <style>
     * {
       margin: 0;
@@ -29,12 +37,13 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #070e1b;
+      background-color: #060c18;
       touch-action: none;
       -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
+      font-family: 'Rajdhani', sans-serif;
     }
     #game-container {
       width: 100%;
@@ -42,139 +51,25 @@
       display: flex;
       justify-content: center;
       align-items: center;
+      background: radial-gradient(circle at center, #0a182c 0%, #060c18 100%);
     }
     canvas {
       display: block;
-      image-rendering: auto;
-    }
-    #apk-download-btn {
-      position: fixed;
-      top: 14px;
-      left: 14px;
-      z-index: 99999;
-      background: rgba(0, 255, 157, 0.9);
-      color: #070e1b;
-      border: 1px solid #00FF9D;
-      border-radius: 20px;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-family: monospace, sans-serif;
-      font-weight: bold;
-      text-decoration: none;
-      box-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
-      backdrop-filter: blur(6px);
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    #apk-download-btn:hover {
-      background: #FFFFFF;
-      box-shadow: 0 0 20px rgba(0, 255, 157, 0.9);
-      transform: scale(1.05);
-    }
-    #qr-float-btn {
-      position: fixed;
-      top: 14px;
-      right: 14px;
-      z-index: 99999;
-      background: rgba(10, 25, 47, 0.85);
-      color: #00F0FF;
-      border: 1px solid #00F0FF;
-      border-radius: 20px;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-family: monospace, sans-serif;
-      font-weight: bold;
-      text-decoration: none;
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
-      backdrop-filter: blur(6px);
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    #qr-float-btn:hover {
-      background: #00F0FF;
-      color: #070e1b;
-      box-shadow: 0 0 20px rgba(0, 240, 255, 0.8);
-      transform: scale(1.05);
-    }
-    @media (max-width: 600px) {
-      #apk-download-btn {
-      position: fixed;
-      top: 14px;
-      left: 14px;
-      z-index: 99999;
-      background: rgba(0, 255, 157, 0.9);
-      color: #070e1b;
-      border: 1px solid #00FF9D;
-      border-radius: 20px;
-      padding: 8px 16px;
-      font-size: 13px;
-      font-family: monospace, sans-serif;
-      font-weight: bold;
-      text-decoration: none;
-      box-shadow: 0 0 10px rgba(0, 255, 157, 0.5);
-      backdrop-filter: blur(6px);
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    #apk-download-btn:hover {
-      background: #FFFFFF;
-      box-shadow: 0 0 20px rgba(0, 255, 157, 0.9);
-      transform: scale(1.05);
-    }
-    #qr-float-btn {
-        display: none; /* Hide on actual mobile devices */
-      }
+      box-shadow: 0 0 30px rgba(0, 240, 255, 0.15);
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-  <a id="apk-download-btn" href="./LogicGatePlumber-release.apk" download="LogicGatePlumber-release.apk" title="Tải file APK Android Production (Tương thích 100% các dòng máy)">
-    ⬇️ Tải APK Android Production
-  </a>
-  <a id="qr-float-btn" href="./qr.html" title="Mở trang quét QR để chuyển sang điện thoại">
-    📱 Quét mã QR Mobile
-  </a>
   <div id="game-container"></div>
   <script type="module" src="./src/main.ts"></script>
   <script>
-    // Hide APK download button and QR button if running inside native Android App (Capacitor), iframe (CrazyGames), or standalone mode
-    (function() {
-      function detectAndHideOnNative() {
-        var isCapacitor = !!(window.Capacitor && (typeof window.Capacitor.isNativePlatform === 'function' ? window.Capacitor.isNativePlatform() : window.Capacitor.platform !== 'web'));
-        var isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        var isFile = window.location.protocol === 'file:' || window.location.protocol === 'capacitor:';
-        var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        var isIframe = false;
-        try { isIframe = window.self !== window.top; } catch(e) { isIframe = true; }
-        var isCrazyGames = window.location.hostname.indexOf('crazygames') !== -1 || window.location.hostname.indexOf('gamepix') !== -1;
-        var isAndroidApp = isCapacitor || isLocalHost || isFile || isStandalone || isIframe || isCrazyGames || /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent);
-
-        if (isAndroidApp) {
-          var apkBtn = document.getElementById('apk-download-btn');
-          if (apkBtn) apkBtn.style.setProperty('display', 'none', 'important');
-          var qrBtn = document.getElementById('qr-float-btn');
-          if (qrBtn) qrBtn.style.setProperty('display', 'none', 'important');
-        }
-      }
-      detectAndHideOnNative();
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', detectAndHideOnNative);
-      }
-      window.addEventListener('load', detectAndHideOnNative);
-    })();
-
-    // Register PWA Service Worker for Offline & Home Screen Install
+    // Register PWA Service Worker for Offline caching
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('✅ PWA Service Worker Registered:', reg.scope))
-          .catch((err) => console.log('PWA Service Worker Registration Failed:', err));
+          .then((reg) => console.log('⚡ PWA Service Worker Registered:', reg.scope))
+          .catch((err) => console.log('PWA SW notice:', err));
       });
     }
   </script>

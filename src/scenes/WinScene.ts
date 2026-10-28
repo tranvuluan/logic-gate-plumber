@@ -1,10 +1,11 @@
 import Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, COLORS } from '../utils/Constants';
+import { COLORS, FONTS } from '../utils/Constants';
 import { ProceduralGraphics } from '../graphics/ProceduralGraphics';
-import { getLevels } from '../logic/LevelGenerator';
-import { ProgressManager, MAX_LEVELS } from '../utils/ProgressManager';
+import { ProgressManager } from '../utils/ProgressManager';
 import { i18n } from '../utils/i18n';
 import { audio } from '../utils/AudioManager';
+import { crazyGames } from '../utils/CrazyGamesManager';
+import { OrientationManager } from '../utils/OrientationManager';
 
 export class WinScene extends Phaser.Scene {
   private levelId: number = 1;
@@ -12,6 +13,7 @@ export class WinScene extends Phaser.Scene {
   private parMoves: number = 5;
   private stars: number = 3;
   private isEndless: boolean = false;
+  private hasTransitioned: boolean = false;
 
   constructor() {
     super({ key: 'WinScene' });
@@ -34,60 +36,76 @@ export class WinScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Notify CrazyGames HappyTime
+    crazyGames.happytime();
     audio.playWin();
+
     this.cameras.main.resetFX();
     this.cameras.main.setAlpha(1);
+
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const isPort = OrientationManager.isPortrait(this);
 
     // Background
     const bg = this.add.graphics();
     const procGraphics = new ProceduralGraphics(this);
-    procGraphics.drawBackground(bg, GAME_WIDTH, GAME_HEIGHT);
+    procGraphics.drawBackground(bg, width, height);
 
-    // Success glow effect
+    // Glowing victory aura
     const glow = this.add.graphics();
-    glow.fillStyle(COLORS.SUCCESS, 0.05);
-    glow.fillCircle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 300);
-    glow.fillStyle(COLORS.SUCCESS, 0.08);
-    glow.fillCircle(GAME_WIDTH / 2, GAME_HEIGHT / 2, 200);
+    glow.fillStyle(COLORS.SIGNAL_ON, 0.08);
+    glow.fillCircle(width / 2, height / 2, 280);
+    glow.fillStyle(COLORS.SIGNAL_ON, 0.12);
+    glow.fillCircle(width / 2, height / 2, 180);
 
     this.tweens.add({
       targets: glow,
       alpha: { from: 0.5, to: 1 },
-      duration: 1000,
+      duration: 900,
       yoyo: true,
       repeat: -1,
     });
 
-    // Victory icon
-    const icon = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.22, '🎉', {
-      fontSize: '84px',
+    // Modal Card
+    const cardW = isPort ? Math.min(640, width - 36) : 600;
+    const cardH = isPort ? 560 : 460;
+    const cardX = (width - cardW) / 2;
+    const cardY = (height - cardH) / 2;
+
+    const card = this.add.graphics();
+    card.fillStyle(0x0c1b30, 0.96);
+    card.lineStyle(2.5, COLORS.SIGNAL_ON, 0.95);
+    card.fillRoundedRect(cardX, cardY, cardW, cardH, 16);
+    card.strokeRoundedRect(cardX, cardY, cardW, cardH, 16);
+
+    // Inner highlight border
+    card.lineStyle(1, 0x00ff9d, 0.3);
+    card.strokeRoundedRect(cardX + 6, cardY + 6, cardW - 12, cardH - 12, 12);
+
+    // Victory Icon
+    const icon = this.add.text(width / 2, cardY + 54, '⚡', {
+      fontSize: '48px',
     });
     icon.setOrigin(0.5);
-    this.tweens.add({
-      targets: icon,
-      y: icon.y - 15,
-      duration: 1400,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
 
-    // Win text
-    const winTitle = this.isEndless
+    // Title
+    const titleStr = this.isEndless
       ? i18n.t('win_endless_title', { level: this.levelId - 100 })
       : i18n.t('win_title', { level: this.levelId });
-    const winText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.35, winTitle, {
-      fontSize: '32px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
+
+    const titleText = this.add.text(width / 2, cardY + 112, titleStr, {
+      fontSize: isPort ? '24px' : '28px',
+      fontFamily: FONTS.TITLE,
+      color: '#00ff9d',
       fontStyle: 'bold',
     });
-    winText.setOrigin(0.5);
+    titleText.setOrigin(0.5);
 
-    // Stars rating display (Animated)
+    // Stars rating with bounce animation
     const starStr = this.stars >= 3 ? '⭐⭐⭐' : this.stars === 2 ? '⭐⭐☆' : '⭐☆☆';
-    const starsText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT * 0.42, starStr, {
-      fontSize: '40px',
+    const starsText = this.add.text(width / 2, cardY + 175, starStr, {
+      fontSize: '46px',
     });
     starsText.setOrigin(0.5);
     starsText.setScale(0);
@@ -96,116 +114,222 @@ export class WinScene extends Phaser.Scene {
       targets: starsText,
       scaleX: 1,
       scaleY: 1,
-      duration: 500,
+      duration: 600,
       ease: 'Back.easeOut',
     });
 
-    // Performance info: Moves & Par
-    const ratingStr = this.stars === 3 ? i18n.t('rating_3_stars') : this.stars === 2 ? i18n.t('rating_2_stars') : i18n.t('rating_1_star');
-    const moveInfo = this.add.text(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT * 0.49,
-      `${i18n.t('win_moves_stat', { moves: this.moves, max: this.parMoves + 4, par: this.parMoves })}\n${ratingStr}`,
-      {
-        fontSize: '15px',
-        fontFamily: 'monospace',
-        color: '#00f0ff',
-        align: 'center',
-        lineSpacing: 8,
-      }
-    );
-    moveInfo.setOrigin(0.5);
+    // Rating Label
+    const ratingLabel =
+      this.stars >= 3
+        ? i18n.t('rating_3_stars')
+        : this.stars === 2
+        ? i18n.t('rating_2_stars')
+        : i18n.t('rating_1_star');
 
-    // Buttons
-    const btnY = GAME_HEIGHT * 0.63;
-    const hasNext = this.isEndless || this.levelId < MAX_LEVELS;
+    const ratingText = this.add.text(width / 2, cardY + 232, ratingLabel, {
+      fontSize: '17px',
+      fontFamily: FONTS.TITLE,
+      color: '#ffd000',
+      fontStyle: 'bold',
+    });
+    ratingText.setOrigin(0.5);
 
-    if (hasNext) {
-      const nextLabel = this.isEndless
-        ? i18n.t('btn_next_endless')
-        : i18n.t('btn_continue_next', { next: this.levelId + 1 });
-      this.createButton(GAME_WIDTH / 2, btnY, nextLabel, '#00ff88', () => {
-        this.cameras.main.resetFX();
-        this.scene.start('GameScene', {
-          levelId: this.levelId + 1,
-          isEndless: this.isEndless,
-        });
+    // Moves Stats
+    const movesDesc = i18n.t('win_moves_stat', {
+      moves: this.moves,
+      max: this.parMoves + 4,
+      par: this.parMoves,
+    });
+    const movesText = this.add.text(width / 2, cardY + 266, movesDesc, {
+      fontSize: '15px',
+      fontFamily: FONTS.UI,
+      color: '#a0c4e8',
+    });
+    movesText.setOrigin(0.5);
+
+    this.hasTransitioned = false;
+
+    // Buttons Container
+    const btnY = cardY + (isPort ? 350 : 326);
+    const nextLevelId = this.levelId + 1;
+
+    // Navigation callbacks
+    const onNextLevel = () => {
+      if (this.hasTransitioned) return;
+      this.hasTransitioned = true;
+      audio.playButtonClick();
+      this.cameras.main.resetFX();
+      this.scene.start('GameScene', {
+        levelId: nextLevelId,
+        isEndless: this.isEndless || nextLevelId > 100,
       });
-    }
+    };
 
-    this.createButton(GAME_WIDTH / 2, btnY + 75, i18n.t('btn_replay'), '#00aaff', () => {
+    const onReplay = () => {
+      if (this.hasTransitioned) return;
+      this.hasTransitioned = true;
+      audio.playButtonClick();
       this.cameras.main.resetFX();
       this.scene.start('GameScene', {
         levelId: this.levelId,
         isEndless: this.isEndless,
       });
-    });
+    };
 
-    this.createButton(GAME_WIDTH / 2, btnY + 150, i18n.t('btn_levels_list'), '#8888cc', () => {
+    const onLevelSelect = () => {
+      if (this.hasTransitioned) return;
+      this.hasTransitioned = true;
+      audio.playButtonClick();
       this.cameras.main.resetFX();
       this.scene.start('LevelSelectScene');
+    };
+
+    // 1. Next Level Button (Primary) with ENTER badge
+    const baseNextText = this.isEndless
+      ? i18n.t('btn_next_endless')
+      : i18n.t('btn_continue_next', { next: nextLevelId });
+    const nextBtnText = `${baseNextText}  [ENTER ↵]`;
+
+    this.createModalButton(
+      width / 2,
+      btnY,
+      Math.min(360, cardW - 40),
+      48,
+      nextBtnText,
+      true,
+      onNextLevel
+    );
+
+    // 2. Replay Button
+    const secBtnW = isPort ? 140 : 170;
+    this.createModalButton(
+      width / 2 - (secBtnW / 2 + 10),
+      btnY + 62,
+      secBtnW,
+      38,
+      `🔄 ${i18n.t('btn_replay')} [R]`,
+      false,
+      onReplay
+    );
+
+    // 3. Level Select Button
+    this.createModalButton(
+      width / 2 + (secBtnW / 2 + 10),
+      btnY + 62,
+      secBtnW,
+      38,
+      `📋 ${i18n.t('btn_levels_list')} [ESC]`,
+      false,
+      onLevelSelect
+    );
+
+    // Bottom Keyboard Helper Hint
+    const isVi = i18n.getLanguage() === 'vi';
+    const hintStr = isVi
+      ? '⌨️ Nhấn phím ENTER hoặc SPACE để qua màn'
+      : '⌨️ Press ENTER or SPACE to continue to next level';
+    const hintText = this.add.text(width / 2, cardY + cardH - 18, hintStr, {
+      fontSize: '12px',
+      fontFamily: FONTS.TITLE,
+      color: '#6086aa',
+      letterSpacing: 0.5,
+    });
+    hintText.setOrigin(0.5);
+
+    this.tweens.add({
+      targets: hintText,
+      alpha: { from: 0.5, to: 1 },
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
     });
 
-    // Sparkle particles
-    this.createSparkles();
+    // Keyboard Shortcuts: ENTER, SPACE, R, ESC
+    if (this.input.keyboard) {
+      this.input.keyboard.on('keydown-ENTER', onNextLevel);
+      this.input.keyboard.on('keydown-SPACE', onNextLevel);
+      this.input.keyboard.on('keydown-R', onReplay);
+      this.input.keyboard.on('keydown-ESC', onLevelSelect);
+    }
+
+    this.events.once('shutdown', () => {
+      if (this.input.keyboard) {
+        this.input.keyboard.removeAllListeners();
+      }
+    });
+
+    // Celebratory spark particles
+    this.createSparkShower(width);
   }
 
-  private createButton(
+  private createModalButton(
     x: number,
     y: number,
+    w: number,
+    h: number,
     text: string,
-    color: string,
+    isPrimary: boolean,
     callback: () => void
   ): void {
-    const btnW = 320;
-    const btnH = 52;
-    const g = this.add.graphics();
-
-    g.fillStyle(COLORS.UI_BUTTON, 1);
-    g.lineStyle(2, Phaser.Display.Color.HexStringToColor(color).color, 0.7);
-    g.fillRoundedRect(x - btnW / 2, y - btnH / 2, btnW, btnH, 10);
-    g.strokeRoundedRect(x - btnW / 2, y - btnH / 2, btnW, btnH, 10);
+    const bg = this.add.graphics();
+    const strokeCol = isPrimary ? COLORS.SIGNAL_ON : COLORS.CYBER_CYAN;
+    bg.fillStyle(isPrimary ? 0x0c3325 : COLORS.UI_BUTTON, 1);
+    bg.lineStyle(2, strokeCol, 0.9);
+    bg.fillRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+    bg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 8);
 
     const label = this.add.text(x, y, text, {
-      fontSize: '18px',
-      fontFamily: 'monospace',
-      color: color,
+      fontSize: isPrimary ? '15px' : '13px',
+      fontFamily: FONTS.TITLE,
+      color: isPrimary ? '#00ff9d' : '#00f0ff',
       fontStyle: 'bold',
     });
     label.setOrigin(0.5);
 
-    const zone = this.add.zone(x, y, btnW, btnH);
-    zone.setInteractive({ useHandCursor: true });
-    zone.on('pointerdown', () => {
+    const hit = this.add.zone(x, y, w, h);
+    hit.setInteractive({ useHandCursor: true });
+
+    hit.on('pointerover', () => {
+      bg.clear();
+      bg.fillStyle(isPrimary ? 0x114d36 : COLORS.UI_BUTTON_HOVER, 1);
+      bg.lineStyle(2.5, isPrimary ? 0x00ffcc : 0x00ffff, 1);
+      bg.fillRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+      bg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+    });
+
+    hit.on('pointerout', () => {
+      bg.clear();
+      bg.fillStyle(isPrimary ? 0x0c3325 : COLORS.UI_BUTTON, 1);
+      bg.lineStyle(2, strokeCol, 0.9);
+      bg.fillRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+      bg.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 8);
+    });
+
+    hit.on('pointerdown', () => {
       audio.playButtonClick();
-      this.tweens.add({
-        targets: [label],
-        scaleX: 0.9,
-        scaleY: 0.9,
-        duration: 80,
-        yoyo: true,
-        onComplete: callback,
-      });
+      callback();
     });
   }
 
-  private createSparkles(): void {
-    for (let i = 0; i < 20; i++) {
-      const x = Phaser.Math.Between(50, GAME_WIDTH - 50);
-      const y = Phaser.Math.Between(50, GAME_HEIGHT - 50);
-      const star = this.add.text(x, y, '✦', {
-        fontSize: `${Phaser.Math.Between(8, 18)}px`,
-        color: '#ffdd44',
-      });
-      star.setAlpha(0);
+  private createSparkShower(width: number): void {
+    for (let i = 0; i < 24; i++) {
+      const spark = this.add.circle(
+        Phaser.Math.Between(width / 2 - 220, width / 2 + 220),
+        Phaser.Math.Between(180, 500),
+        Phaser.Math.Between(2, 4),
+        i % 2 === 0 ? COLORS.SIGNAL_ON : COLORS.CYBER_CYAN,
+        1
+      );
+
       this.tweens.add({
-        targets: star,
-        alpha: { from: 0, to: 0.7 },
-        scale: { from: 0.5, to: 1.2 },
-        duration: Phaser.Math.Between(800, 2000),
-        delay: Phaser.Math.Between(0, 3000),
-        yoyo: true,
-        repeat: -1,
+        targets: spark,
+        y: spark.y - Phaser.Math.Between(40, 100),
+        x: spark.x + Phaser.Math.Between(-30, 30),
+        alpha: { from: 1, to: 0 },
+        scale: { from: 1, to: 0.2 },
+        duration: Phaser.Math.Between(800, 1500),
+        delay: Phaser.Math.Between(0, 400),
+        onComplete: () => spark.destroy(),
       });
     }
   }

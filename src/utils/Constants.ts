@@ -1,46 +1,59 @@
-// Game dimensions (portrait mode, standard mobile)
-export const GAME_WIDTH = 720;
-export const GAME_HEIGHT = 1280;
+// Game dimensions (Responsive Dual-Orientation: 16:9 Landscape & 9:16 Portrait)
+export const LANDSCAPE_WIDTH = 1280;
+export const LANDSCAPE_HEIGHT = 720;
+export const PORTRAIT_WIDTH = 720;
+export const PORTRAIT_HEIGHT = 1280;
+
+// Default fallback dimensions
+export const GAME_WIDTH = 1280;
+export const GAME_HEIGHT = 720;
 
 // Grid settings
-export const CELL_SIZE = 110;
-export const GRID_PADDING = 30;
+export const CELL_SIZE = 96;
+export const GRID_PADDING = 24;
+
+// High-tech Cyberpunk Google Fonts
+export const FONTS = {
+  TITLE: "'Orbitron', 'Rajdhani', sans-serif",
+  UI: "'Rajdhani', 'Orbitron', sans-serif",
+  MONO: "'Orbitron', monospace",
+};
 
 // Cyberpunk Circuit Colors
 export const COLORS = {
   // Background & Board
-  BG_DARK: 0x070e1b,
-  BG_CARD: 0x0f1c30,
-  BG_HOVER: 0x162a48,
-  BOARD_BG: 0x091424,
+  BG_DARK: 0x060c18,
+  BG_CARD: 0x0c1a2e,
+  BG_HOVER: 0x142844,
+  BOARD_BG: 0x081322,
   BOARD_BORDER: 0x00f0ff,
-  BOARD_GRID: 0x142844,
+  BOARD_GRID: 0x12243d,
 
   // Neon Signal Glow
-  SIGNAL_ON: 0x00ff88,       // Neon Green (Active High 1)
-  SIGNAL_ON_GLOW: 0x00ffaa,  // Lighter cyan-green glow
-  SIGNAL_OFF: 0x22364c,      // Inactive dark wire (Low 0)
+  SIGNAL_ON: 0x00ff9d,       // Vivid Neon Green (Active High 1)
+  SIGNAL_ON_GLOW: 0x00ffbb,  // Electric mint cyan glow
+  SIGNAL_OFF: 0x1e3247,      // Inactive dark wire (Low 0)
   SIGNAL_WRONG: 0xff2a55,    // Mismatched / unpowered
-  WIRE_COPPER: 0xbf8230,     // Unpowered copper trace
+  WIRE_COPPER: 0xd49339,     // Unpowered copper PCB trace
 
   // Cyberpunk Accents
   CYBER_CYAN: 0x00f0ff,
-  CYBER_PURPLE: 0x8b00ff,
+  CYBER_PURPLE: 0x9d4edd,
   CYBER_PINK: 0xff007f,
   CYBER_YELLOW: 0xffd000,
   CYBER_GOLD: 0xffc400,
 
   // Gate Visuals
-  GATE_BODY: 0x112238,
-  GATE_BODY_LOCKED: 0x202936,     // Heavy metallic locked base
-  GATE_BORDER: 0x00a8cc,
-  GATE_BORDER_LOCKED: 0x7c8c9e,   // Industrial steel border
+  GATE_BODY: 0x0f2138,
+  GATE_BODY_LOCKED: 0x1a2636,     // Heavy metallic locked base
+  GATE_BORDER: 0x00d2ff,
+  GATE_BORDER_LOCKED: 0x6e8294,   // Industrial steel border
   GATE_TEXT: 0xffffff,
 
   // LED States
-  LED_ON: 0x00ff66,
-  LED_OFF: 0x1c2b3a,
-  LED_GLOW: 0x00ff88,
+  LED_ON: 0x00ff9d,
+  LED_OFF: 0x172535,
+  LED_GLOW: 0x00ffaa,
   LED_ZERO_TARGET: 0x00b4d8,     // Target 0 indicator (Cyan blue)
   LED_ZERO_MATCH: 0x00f5d4,      // Target 0 matched
   LED_ALERT_RED: 0xff2255,       // Short-circuit / mismatch red
@@ -50,18 +63,18 @@ export const COLORS = {
   SHORT_CIRCUIT_GLOW: 0xff5252,
 
   // UI
-  UI_PANEL: 0x0d1a2d,
-  UI_BORDER: 0x00aaff,
+  UI_PANEL: 0x0a182b,
+  UI_BORDER: 0x00f0ff,
   UI_PRIMARY: 0x00f0ff,
-  UI_SECONDARY: 0x00a8cc,
+  UI_SECONDARY: 0x00c4e8,
   UI_TEXT_MAIN: 0xffffff,
-  UI_TEXT_MUTED: 0x7a99b8,
+  UI_TEXT_MUTED: 0x82a5c7,
   UI_TEXT_CYAN: 0x00f0ff,
-  UI_BUTTON: 0x132a48,
-  UI_BUTTON_HOVER: 0x1b3c66,
-  UI_BUTTON_ACTIVE: 0x00a870,
-  SUCCESS: 0x00ff88,
-  PCB_TRACE: 0xbf8230,
+  UI_BUTTON: 0x102540,
+  UI_BUTTON_HOVER: 0x193b66,
+  UI_BUTTON_ACTIVE: 0x00c282,
+  SUCCESS: 0x00ff9d,
+  PCB_TRACE: 0xd49339,
 };
 
 // Gate types
@@ -138,15 +151,15 @@ export interface LevelDefinition {
 
 // Animation durations
 export const ANIM = {
-  ROTATE_DURATION: 180,
-  HINT_ROTATE_DURATION: 300,
-  SIGNAL_PULSE_SPEED: 400,
-  LED_GLOW_DURATION: 400,
-  WIN_DELAY: 900,
+  ROTATE_DURATION: 160,
+  HINT_ROTATE_DURATION: 260,
+  SIGNAL_PULSE_SPEED: 350,
+  LED_GLOW_DURATION: 350,
+  WIN_DELAY: 800,
 };
 
 // Touch settings
 export const TOUCH = {
-  LONG_PRESS_MS: 400,
-  TAP_THRESHOLD_PX: 16,
+  LONG_PRESS_MS: 380,
+  TAP_THRESHOLD_PX: 14,
 };
