@@ -86,9 +86,10 @@ export class GameScene extends Phaser.Scene {
   // Gate Inspector & Truth Table Container (Right side)
   private inspectorContainer!: Phaser.GameObjects.Container;
 
-  // Plumber character and keyboard movement
+  // Plumber character and movement
   private player!: Phaser.GameObjects.Sprite;
   private playerSpeed: number = 320;
+  private isPlayerWalking: boolean = false;
   private cursors?: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasdKeys?: { [key: string]: Phaser.Input.Keyboard.Key };
 
@@ -265,6 +266,9 @@ export class GameScene extends Phaser.Scene {
 
     // Keyboard controls
     this.setupKeyboardControls();
+
+    // Touch & Swipe controls
+    this.setupTouchControls();
 
     // Initial signal propagation
     this.propagateSignals();
@@ -498,33 +502,47 @@ export class GameScene extends Phaser.Scene {
     // Render default inspector
     this.renderDefaultInspector();
 
-    // Bottom Large Mobile Touch Action Buttons
-    const touchBtnY = botPy + botPh - 54;
-    const rotLeftW = 175;
-    const rotRightW = 220;
-    const cheatW = 145;
+    // Bottom Controls: Cyberpunk Virtual D-Pad (Left) + Action Buttons (Right)
+    const isVi = i18n.getLanguage() === 'vi';
+    const dpadCenterX = px + 115;
+    const dpadCenterY = botPy + botPh - 86;
+    this.createVirtualDPad(dpadCenterX, dpadCenterY);
+
+    const dpadLabel = this.add.text(dpadCenterX, botPy + botPh - 18, isVi ? '🎮 DI CHUYỂN' : '🎮 MOVE', {
+      fontSize: '11px',
+      fontFamily: FONTS.TITLE,
+      color: '#00f0ff',
+      fontStyle: 'bold',
+    });
+    dpadLabel.setOrigin(0.5);
+    dpadLabel.setDepth(82);
+
+    // Right Action Buttons
+    const actionBtnY = botPy + botPh - 86;
+    const rotLeftW = 125;
+    const rotRightW = 150;
+    const cheatW = 110;
 
     // Rotate Left CCW
-    this.createPanelButton(px + 16 + rotLeftW / 2, touchBtnY, rotLeftW, 46, i18n.t('btn_rotate_left'), COLORS.CYBER_CYAN, () => {
+    this.createPanelButton(px + 295, actionBtnY, rotLeftW, 56, i18n.t('btn_rotate_left'), COLORS.CYBER_CYAN, () => {
       this.rotateSelectedOrTargetGate(-1);
     });
 
     // Rotate Right CW (Primary)
-    this.createPanelButton(px + pw / 2, touchBtnY, rotRightW, 46, i18n.t('btn_rotate_right'), COLORS.SIGNAL_ON, () => {
+    this.createPanelButton(px + 445, actionBtnY, rotRightW, 56, i18n.t('btn_rotate_right'), COLORS.SIGNAL_ON, () => {
       this.rotateSelectedOrTargetGate(1);
     });
 
     // Cheat Sheet
-    this.createPanelButton(px + pw - 16 - cheatW / 2, touchBtnY, cheatW, 46, `📖 ${i18n.t('btn_cheat_sheet')}`, COLORS.CYBER_YELLOW, () => {
+    this.createPanelButton(px + 585, actionBtnY, cheatW, 56, `📖 ${i18n.t('btn_cheat_sheet')}`, COLORS.CYBER_YELLOW, () => {
       this.toggleCheatSheet();
     });
 
     // Subtitle helper for touch
-    const isVi = i18n.getLanguage() === 'vi';
     const touchHelper = this.add.text(
-      px + pw / 2,
-      botPy + botPh - 15,
-      isVi ? '📱 Chạm cổng trên lưới để xoay hoặc dùng nút xoay bên dưới' : '📱 Tap any gate on grid or use rotate buttons below',
+      px + 440,
+      botPy + botPh - 18,
+      isVi ? '📱 Chạm ô bất kỳ để đi tới & xoay' : '📱 Tap any cell to walk & rotate',
       {
         fontSize: '11px',
         fontFamily: FONTS.UI,
@@ -854,8 +872,8 @@ export class GameScene extends Phaser.Scene {
     const outSignal = cellState?.outputSignal ?? 0;
 
     // Gate Name
-    const gateTitle = this.add.text(pw / 2, 16, this.getGateName(cell.type), {
-      fontSize: isPort ? '17px' : '16px',
+    const gateTitle = this.add.text(pw / 2, isPort ? 12 : 16, this.getGateName(cell.type), {
+      fontSize: isPort ? '16px' : '16px',
       fontFamily: FONTS.TITLE,
       color: '#00ff9d',
       fontStyle: 'bold',
@@ -867,10 +885,10 @@ export class GameScene extends Phaser.Scene {
     const inB = inSignals.length > 1 ? inSignals[1] : 0;
     const sigStatus = this.add.text(
       pw / 2,
-      isPort ? 42 : 44,
+      isPort ? 32 : 44,
       `IN: [${inA}, ${inB}] ➔ OUT: [${outSignal}]`,
       {
-        fontSize: '13px',
+        fontSize: isPort ? '12px' : '13px',
         fontFamily: FONTS.MONO,
         color: outSignal === 1 ? '#00ff9d' : '#88a4c2',
         fontStyle: 'bold',
@@ -879,8 +897,8 @@ export class GameScene extends Phaser.Scene {
     sigStatus.setOrigin(0.5);
 
     // Truth Table Title
-    const ttHeader = this.add.text(pw / 2, isPort ? 68 : 78, i18n.t('truth_table_title'), {
-      fontSize: '12px',
+    const ttHeader = this.add.text(pw / 2, isPort ? 52 : 78, i18n.t('truth_table_title'), {
+      fontSize: isPort ? '11px' : '12px',
       fontFamily: FONTS.TITLE,
       color: '#00f0ff',
       fontStyle: 'bold',
@@ -889,13 +907,14 @@ export class GameScene extends Phaser.Scene {
 
     // Draw Truth Table Rows
     const tableData = this.getTruthTableData(cell.type);
-    let tableEndY = isPort ? 86 : 96;
+    let tableEndY = isPort ? 68 : 96;
     if (tableData) {
-      const tableW = isPort ? Math.min(360, pw - 40) : pw - 30;
+      const tableW = isPort ? Math.min(320, pw - 40) : pw - 30;
       const tableX = (pw - tableW) / 2;
-      const tableY = isPort ? 84 : 96;
+      const tableY = isPort ? 66 : 96;
       const rowCount = tableData.rows.length;
-      const tableH = rowCount * 24 + 28;
+      const rowH = isPort ? 18 : 24;
+      const tableH = rowCount * rowH + (isPort ? 20 : 28);
       tableEndY = tableY + tableH;
 
       const tableBg = this.add.graphics();
@@ -906,8 +925,8 @@ export class GameScene extends Phaser.Scene {
       this.inspectorContainer.add(tableBg);
 
       // Header row
-      const hdrRow = this.add.text(pw / 2, tableY + 14, `${tableData.headers.join('   |   ')}`, {
-        fontSize: '12px',
+      const hdrRow = this.add.text(pw / 2, tableY + (isPort ? 10 : 14), `${tableData.headers.join('   |   ')}`, {
+        fontSize: isPort ? '11px' : '12px',
         fontFamily: FONTS.MONO,
         color: '#ffd000',
         fontStyle: 'bold',
@@ -917,18 +936,18 @@ export class GameScene extends Phaser.Scene {
 
       // Data rows
       tableData.rows.forEach((r, idx) => {
-        const rowY = tableY + 38 + idx * 24;
+        const rowY = tableY + (isPort ? 26 : 38) + idx * rowH;
         const isMatch = r[0] === inA && (tableData.headers.length === 2 || r[1] === inB);
 
         if (isMatch) {
           const matchHighlight = this.add.graphics();
           matchHighlight.fillStyle(0x00ff9d, 0.2);
-          matchHighlight.fillRect(tableX + 2, rowY - 10, tableW - 4, 20);
+          matchHighlight.fillRect(tableX + 2, rowY - (isPort ? 8 : 10), tableW - 4, isPort ? 16 : 20);
           this.inspectorContainer.add(matchHighlight);
         }
 
         const rowText = this.add.text(pw / 2, rowY, r.join('   |   '), {
-          fontSize: '13px',
+          fontSize: isPort ? '12px' : '13px',
           fontFamily: FONTS.MONO,
           color: isMatch ? '#00ff9d' : '#88a4c2',
           fontStyle: isMatch ? 'bold' : 'normal',
@@ -939,14 +958,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     // Explanation text at bottom of table
-    const descY = tableEndY + (isPort ? 14 : 18);
+    const descY = tableEndY + (isPort ? 8 : 18);
     const descText = this.add.text(pw / 2, descY, this.getGateRuleText(cell.type), {
-      fontSize: '13px',
+      fontSize: isPort ? '12px' : '13px',
       fontFamily: FONTS.UI,
       color: '#d0e5ff',
       align: 'center',
       wordWrap: { width: pw - 36 },
-      lineSpacing: 4,
+      lineSpacing: isPort ? 2 : 4,
     });
     descText.setOrigin(0.5, 0);
 
@@ -955,15 +974,15 @@ export class GameScene extends Phaser.Scene {
     if (isPort) {
       const missionIntel = this.add.text(
         pw / 2,
-        descY + 44,
+        descY + 28,
         `💡 ${this.tutorialText}`,
         {
-          fontSize: '12px',
+          fontSize: '11px',
           fontFamily: FONTS.UI,
           color: '#ffd000',
           align: 'center',
           wordWrap: { width: pw - 50 },
-          lineSpacing: 3,
+          lineSpacing: 2,
         }
       );
       missionIntel.setOrigin(0.5, 0);
@@ -1201,25 +1220,31 @@ export class GameScene extends Phaser.Scene {
           this.renderGateInspector(gate, cellR, cellC);
         });
 
-        // Click handling: Left click = CW (+1), Right click = CCW (-1)
+        // Click/Touch handling: Move player to cell + Left click = CW (+1), Right click = CCW (-1)
         container.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-          if (this.isWon || this.isTimeOver || this.isOutOfMoves || this.isAnimating) return;
+          if (this.isWon || this.isTimeOver || this.isOutOfMoves) return;
 
           const cellDef = this.grid[cellR]?.[cellC];
-          if (!cellDef || cellDef.fixed || cellDef.locked || cellDef.type === GateType.SOURCE || cellDef.type === GateType.LED) {
-            return;
-          }
-
           this.selectedCell = { row: cellR, col: cellC };
-          this.renderGateInspector(cellDef, cellR, cellC);
+          this.activeHoveredCell = { row: cellR, col: cellC };
+
+          if (cellDef) {
+            this.renderGateInspector(cellDef, cellR, cellC);
+          }
 
           if (this.tutorialPointer) {
             this.tutorialPointer.destroy();
             this.tutorialPointer = undefined;
           }
 
-          const direction: 1 | -1 = pointer.rightButtonDown() || pointer.button === 2 ? -1 : 1;
-          this.handleCellTap(cellR, cellC, direction);
+          // Move player character directly to this tapped cell
+          this.movePlayerToCell(cellR, cellC, () => {
+            if (this.isAnimating) return;
+            if (cellDef && !cellDef.fixed && !cellDef.locked && cellDef.type !== GateType.SOURCE && cellDef.type !== GateType.LED) {
+              const direction: 1 | -1 = pointer.rightButtonDown() || pointer.button === 2 ? -1 : 1;
+              this.handleCellTap(cellR, cellC, direction);
+            }
+          });
         });
 
         this.cellSprites[r][c] = {
@@ -1735,6 +1760,198 @@ export class GameScene extends Phaser.Scene {
 
     this.selectedCell = { row: startR, col: startC };
     this.activeHoveredCell = { row: startR, col: startC };
+  }
+
+  private setupTouchControls(): void {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+
+    this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
+      touchStartX = p.x;
+      touchStartY = p.y;
+      touchStartTime = Date.now();
+    });
+
+    this.input.on('pointerup', (p: Phaser.Input.Pointer) => {
+      const dx = p.x - touchStartX;
+      const dy = p.y - touchStartY;
+      const dt = Date.now() - touchStartTime;
+      const dist = Math.hypot(dx, dy);
+
+      // Swipe detected (> 35px within 450ms)
+      if (dist > 35 && dt < 450) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          this.movePlayerDirection(0, dx > 0 ? 1 : -1);
+        } else {
+          this.movePlayerDirection(dy > 0 ? 1 : -1, 0);
+        }
+      }
+    });
+  }
+
+  private movePlayerToCell(row: number, col: number, onArrival?: () => void): void {
+    if (!this.player) {
+      onArrival?.();
+      return;
+    }
+
+    const targetX = this.boardOffsetX + col * this.cellSize + this.cellSize / 2;
+    const targetY = this.boardOffsetY + row * this.cellSize + this.cellSize / 2;
+
+    const currentX = this.player.x;
+    const currentY = this.player.y;
+
+    // Flip towards movement direction
+    if (targetX < currentX - 2) {
+      this.player.setFlipX(true);
+    } else if (targetX > currentX + 2) {
+      this.player.setFlipX(false);
+    }
+
+    const dist = Phaser.Math.Distance.Between(currentX, currentY, targetX, targetY);
+    if (dist < 4) {
+      onArrival?.();
+      return;
+    }
+
+    this.tweens.killTweensOf(this.player);
+
+    const duration = Math.min(240, Math.max(80, (dist / (this.playerSpeed * 1.5)) * 1000));
+    this.isPlayerWalking = true;
+
+    this.tweens.add({
+      targets: this.player,
+      x: targetX,
+      y: targetY,
+      duration: duration,
+      ease: 'Quad.easeOut',
+      onComplete: () => {
+        this.isPlayerWalking = false;
+        this.tweens.add({
+          targets: this.player,
+          scaleY: { from: (this.cellSize / CELL_SIZE) * 0.82, to: (this.cellSize / CELL_SIZE) * 0.88 },
+          duration: 650,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut',
+        });
+        onArrival?.();
+      },
+    });
+
+    audio.playButtonClick();
+  }
+
+  private movePlayerDirection(dRow: number, dCol: number): void {
+    if (!this.player || this.isWon || this.isTimeOver || this.isOutOfMoves) return;
+
+    let currCol = Math.round((this.player.x - this.boardOffsetX - this.cellSize / 2) / this.cellSize);
+    let currRow = Math.round((this.player.y - this.boardOffsetY - this.cellSize / 2) / this.cellSize);
+
+    currCol = Phaser.Math.Clamp(currCol, 0, this.gridWidth - 1);
+    currRow = Phaser.Math.Clamp(currRow, 0, this.gridHeight - 1);
+
+    const nextRow = Phaser.Math.Clamp(currRow + dRow, 0, this.gridHeight - 1);
+    const nextCol = Phaser.Math.Clamp(currCol + dCol, 0, this.gridWidth - 1);
+
+    if (nextRow === currRow && nextCol === currCol) return;
+
+    this.selectedCell = { row: nextRow, col: nextCol };
+    this.activeHoveredCell = { row: nextRow, col: nextCol };
+
+    const targetCell = this.grid[nextRow]?.[nextCol];
+    if (targetCell) {
+      this.renderGateInspector(targetCell, nextRow, nextCol);
+    }
+
+    this.movePlayerToCell(nextRow, nextCol);
+  }
+
+  private createVirtualDPad(centerX: number, centerY: number): void {
+    const btnSize = 42;
+    const spacing = 46;
+
+    // Cyberpunk circular backdrop
+    const padBg = this.add.graphics();
+    padBg.fillStyle(0x06152b, 0.85);
+    padBg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.4);
+    padBg.fillCircle(centerX, centerY, 68);
+    padBg.strokeCircle(centerX, centerY, 68);
+    padBg.setDepth(85);
+
+    // Center icon
+    const centerBadge = this.add.text(centerX, centerY, '⚡', {
+      fontSize: '18px',
+      color: '#00f0ff',
+    });
+    centerBadge.setOrigin(0.5);
+    centerBadge.setDepth(86);
+
+    const directions = [
+      { dRow: -1, dCol: 0, x: centerX, y: centerY - spacing, icon: '▲' },
+      { dRow: 1, dCol: 0, x: centerX, y: centerY + spacing, icon: '▼' },
+      { dRow: 0, dCol: -1, x: centerX - spacing, y: centerY, icon: '◀' },
+      { dRow: 0, dCol: 1, x: centerX + spacing, y: centerY, icon: '▶' },
+    ];
+
+    directions.forEach((dir) => {
+      const btn = this.add.container(dir.x, dir.y);
+      btn.setDepth(87);
+
+      const bg = this.add.graphics();
+      bg.fillStyle(0x102540, 0.95);
+      bg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.75);
+      bg.fillRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
+      bg.strokeRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
+
+      const txt = this.add.text(0, 0, dir.icon, {
+        fontSize: '17px',
+        color: '#00f0ff',
+        fontStyle: 'bold',
+      });
+      txt.setOrigin(0.5);
+
+      const hit = this.add.rectangle(0, 0, btnSize + 8, btnSize + 8, 0x000000, 0.001);
+      hit.setInteractive({ useHandCursor: true });
+
+      btn.add([bg, txt, hit]);
+
+      let repeatTimer: Phaser.Time.TimerEvent | null = null;
+
+      const startMove = () => {
+        this.movePlayerDirection(dir.dRow, dir.dCol);
+        bg.clear();
+        bg.fillStyle(COLORS.CYBER_CYAN, 0.4);
+        bg.lineStyle(2, 0x00ff9d, 1);
+        bg.fillRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
+        bg.strokeRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
+
+        if (repeatTimer) repeatTimer.remove(false);
+        repeatTimer = this.time.addEvent({
+          delay: 170,
+          callback: () => this.movePlayerDirection(dir.dRow, dir.dCol),
+          loop: true,
+          startAt: -80,
+        });
+      };
+
+      const stopMove = () => {
+        if (repeatTimer) {
+          repeatTimer.remove(false);
+          repeatTimer = null;
+        }
+        bg.clear();
+        bg.fillStyle(0x102540, 0.95);
+        bg.lineStyle(1.5, COLORS.CYBER_CYAN, 0.75);
+        bg.fillRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
+        bg.strokeRoundedRect(-btnSize / 2, -btnSize / 2, btnSize, btnSize, 8);
+      };
+
+      hit.on('pointerdown', startMove);
+      hit.on('pointerup', stopMove);
+      hit.on('pointerout', stopMove);
+    });
   }
 
   private propagateSignals(): void {
@@ -2337,6 +2554,8 @@ export class GameScene extends Phaser.Scene {
       if (this.cursors?.down.isDown || this.wasdKeys?.S.isDown) vy += 1;
 
       if (vx !== 0 || vy !== 0) {
+        this.tweens.killTweensOf(this.player);
+        this.isPlayerWalking = false;
         const len = Math.hypot(vx, vy);
         const normX = vx / len;
         const normY = vy / len;
