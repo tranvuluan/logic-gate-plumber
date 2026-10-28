@@ -21,8 +21,7 @@
   <meta name="theme-color" content="#060c18" />
   <meta name="description" content="Logic Gate Plumber - High-tech cyberpunk digital circuit puzzle game. Rotate logic gates and connect electrical power!" />
 
-  <!-- App Icons & Manifest -->
-  <link rel="manifest" href="./manifest.json" />
+  <!-- App Icons -->
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
   <link rel="apple-touch-icon" href="./icon-192.png" />
 
@@ -63,15 +62,5 @@
 <body>
   <div id="game-container"></div>
   <script type="module" src="./src/main.ts"></script>
-  <script>
-    // Register PWA Service Worker for Offline caching
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => console.log('⚡ PWA Service Worker Registered:', reg.scope))
-          .catch((err) => console.log('PWA SW notice:', err));
-      });
-    }
-  </script>
 </body>
 </html>
